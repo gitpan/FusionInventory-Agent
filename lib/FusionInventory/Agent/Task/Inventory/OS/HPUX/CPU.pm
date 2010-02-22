@@ -1,8 +1,8 @@
 package FusionInventory::Agent::Task::Inventory::OS::AIX::CPU;
 
-sub doInventory  { $^O =~ /hpux/ }
+sub isInventoryEnabled  { $^O =~ /hpux/ }
 
-sub run {
+sub doInventory {
    my $params = shift;
    my $inventory = $params->{inventory};
 
@@ -59,6 +59,16 @@ sub run {
          {
             $processors=$1;
          }
+         # Added for HPUX 11.31
+	 if ( /Intel\(R\) Itanium 2 9000 series processor \((\d+\.\d+)/ || /Intel\(R\) Itanium 2 9000 series processors \((\d+\.\d+)/ )
+         {
+            $processors=$1*1000;
+         }
+         if ( /(\d+)\s+logical processors/ )
+         {
+            $processorn=$1;
+         }
+         # end HPUX 11.31
       }
    }
    else

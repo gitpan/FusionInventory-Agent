@@ -9,9 +9,9 @@ FusionInventory::Agent::XML::Query::Inventory - the XML abstraction layer
 
 =head1 DESCRIPTION
 
-OCS Inventory uses XML for the data transmition. The module is the
-abstraction layer. It's mostly used in the backend module where it
-called $inventory in general.
+FusionInventory uses OCS Inventory XML format for the data transmition. This
+module is the abstraction layer. It's mostly used in the backend module where
+it called $inventory in general.
 
 =cut
 
@@ -65,9 +65,6 @@ sub new {
   $self->{h}{CONTENT}{VIRTUALMACHINES} = [];
   $self->{h}{CONTENT}{SOUNDS} = [];
   $self->{h}{CONTENT}{MODEMS} = [];
-
-  # For software deployment
-  $self->{h}{CONTENT}{DOWNLOAD}{HISTORY}{PACKAGE} = [];
 
   # Is the XML centent initialised?
   $self->{isInitialised} = undef;
@@ -481,50 +478,25 @@ sub addSounds {
    $self->addSound(@_);
 }
 
+
 =item addNetwork()
 
-Register a network in the inventory.
+Register a network interface in the inventory.
 
 =cut
 sub addNetwork {
-  # TODO IPSUBNET, IPMASK IPADDRESS seem to be missing.
-  my ($self, $args) = @_;
+my ($self, $args) = @_;
 
-  my $description = $args->{DESCRIPTION};
-  my $driver = $args->{DRIVER};
-  my $ipaddress = $args->{IPADDRESS};
-  my $ipdhcp = $args->{IPDHCP};
-  my $ipgateway = $args->{IPGATEWAY};
-  my $ipmask = $args->{IPMASK};
-  my $ipsubnet = $args->{IPSUBNET};
-  my $macaddr = $args->{MACADDR};
-  my $pcislot = $args->{PCISLOT};
-  my $slaves = $args->{SLAVES}; # For Network bonding
-  my $status = $args->{STATUS};
-  my $type = $args->{TYPE};
-  my $virtualdev = $args->{VIRTUALDEV};
+    my %tmpXml = ();
 
-#  return unless $ipaddress;
+    foreach my $item (qw/DESCRIPTION DRIVER IPADDRESS IPDHCP IPGATEWAY
+        IPMASK IPSUBNET MACADDR PCISLOT STATUS TYPE VIRTUALDEV SLAVES/) {
+        $tmpXml{$item} = [$args->{$item} ? $args->{$item} : ''];
+    }
+    push (@{$self->{h}{CONTENT}{NETWORKS}},\%tmpXml);
 
-  push @{$self->{h}{CONTENT}{NETWORKS}},
-  {
-
-    DESCRIPTION => [$description?$description:''],
-    DRIVER => [$driver?$driver:''],
-    IPADDRESS => [$ipaddress?$ipaddress:''],
-    IPDHCP => [$ipdhcp?$ipdhcp:''],
-    IPGATEWAY => [$ipgateway?$ipgateway:''],
-    IPMASK => [$ipmask?$ipmask:''],
-    IPSUBNET => [$ipsubnet?$ipsubnet:''],
-    MACADDR => [$macaddr?$macaddr:''],
-    PCISLOT => [$pcislot?$pcislot:''],
-    SLAVES => [$slaves?$slaves:''],
-    STATUS => [$status?$status:''],
-    TYPE => [$type?$type:''],
-    VIRTUALDEV => [$virtualdev?$virtualdev:''],
-
-  };
 }
+
 # For compatibiliy
 sub addNetworks {
    my $self = shift;
@@ -591,7 +563,9 @@ sub addCPU {
   my ($self, $args) = @_;
 
   # The CPU FLAG
+  my $code = $args->{CODE};
   my $manufacturer = $args->{MANUFACTURER};
+  my $thread = $args->{THREAD};
   my $type = $args->{TYPE};
   my $serial = $args->{SERIAL};
   my $speed = $args->{SPEED};
@@ -599,7 +573,9 @@ sub addCPU {
   push @{$self->{h}{CONTENT}{CPUS}},
   {
 
+    CORE => [$code],
     MANUFACTURER => [$manufacturer],
+    THREAD => [$thread],
     TYPE => [$type],
     SERIAL => [$serial],
     SPEED => [$speed],
@@ -813,8 +789,13 @@ sub addSoftwareDeploymentPackage {
 
   my $orderId = $args->{ORDERID};
 
-  push (@{$self->{h}{CONTENT}{DOWNLOAD}{HISTORY}{PACKAGE}}, $orderId);
+  # For software deployment
+  if (!$self->{h}{CONTENT}{DOWNLOAD}{HISTORY}) {
+      $self->{h}{CONTENT}{DOWNLOAD}{HISTORY} = [];
+  }
 
+  push (@{$self->{h}{CONTENT}{DOWNLOAD}{HISTORY}->[0]{PACKAGE}}, { ID =>
+          $orderId });
 }
 
 =item getContent()
@@ -899,14 +880,16 @@ sub writeXML {
   my ($self, $args) = @_;
 
   my $logger = $self->{logger};
+  my $config = $self->{config};
+  my $target = $self->{target};
 
-  if ($self->{config}{local} =~ /^$/) {
+  if ($config->{local} =~ /^$/) {
     $logger->fault ('local path unititalised!');
   }
 
   $self->initialise();
 
-  my $localfile = $self->{config}{local}."/".$self->{config}{deviceid}.'.ocs';
+  my $localfile = $config->{local}."/".$target->{deviceid}.'.ocs';
   $localfile =~ s!(//){1,}!/!;
 
   # Convert perl data structure into xml strings

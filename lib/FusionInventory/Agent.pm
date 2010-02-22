@@ -67,7 +67,7 @@ sub new {
         $logger->info("You should run this program as super-user.");
     }
 
-    if (!-f $config->{basevardir} && !mkpath($config->{basevardir})) {
+    if (!-d $config->{basevardir} && !mkpath($config->{basevardir})) {
         $logger->error("Failed to create ".$config->{basevardir});
     }
 
@@ -259,8 +259,7 @@ sub main {
             $cmd .= " ".$target->{vardir};
 
             $logger->debug("cmd is: '$cmd'");
-            use IPC::Run;
-            IPC::Run::run($cmd);
+            system($cmd);
 
             $logger->debug("[task] end of ".$task);
         }

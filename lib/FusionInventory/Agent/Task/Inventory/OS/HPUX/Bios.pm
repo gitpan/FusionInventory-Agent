@@ -1,9 +1,9 @@
 package FusionInventory::Agent::Task::Inventory::OS::AIX::Bios;
 use strict;
 
-sub doInventory { $^O =~ /hpux/ }
+sub isInventoryEnabled { $^O =~ /hpux/ }
 
-sub run { 
+sub doInventory { 
   my $params = shift;
   my $inventory = $params->{inventory};
 
@@ -37,6 +37,14 @@ sub run {
       };
   };
 
+  # Added for HPUX 11.31
+  for ( `machinfo |grep "achine serial number"` )
+  {
+      if ( /:\s+(\w+)/ )
+      {
+         $SystemSerial=$1;
+      };
+  };
 
   $inventory->setBios ({
       BVERSION => $BiosVersion,
