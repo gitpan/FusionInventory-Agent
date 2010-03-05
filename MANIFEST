@@ -194,6 +194,7 @@ lib/FusionInventory/Agent/Task/Inventory/Virtualization/Xen.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Xen/XM.pm
 lib/FusionInventory/Agent/Task/NetDiscovery.pm
 lib/FusionInventory/Agent/Task/NetDiscovery/dico.pm
+lib/FusionInventory/Agent/Task/NetDiscovery/Dico.pm
 lib/FusionInventory/Agent/Task/OcsDeploy.pm
 lib/FusionInventory/Agent/Task/SNMPQuery.pm
 lib/FusionInventory/Agent/Task/WakeOnLan.pm

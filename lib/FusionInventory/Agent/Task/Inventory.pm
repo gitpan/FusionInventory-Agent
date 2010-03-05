@@ -70,6 +70,7 @@ sub main {
           logger => $logger,
 
       });
+  my $inventory = $self->{inventory};
 
   if (!$config->{'stdout'} && !$config->{'local'}) {
       $logger->fault("No prologresp!") unless $prologresp;
@@ -85,11 +86,11 @@ sub main {
   $self->feedInventory();
 
 
-  if ($config->{stdout}) {
+  if ($target->{type} eq 'stdout') {
       $self->{inventory}->printXML();
-  } elsif ($config->{local}) {
+  } elsif ($target->{'type'} eq 'local') {
       $self->{inventory}->writeXML();
-  } elsif ($config->{server}) {
+  } elsif ($target->{'type'} eq 'server') {
 
       my $accountinfo = $target->{accountinfo};
 
@@ -104,9 +105,10 @@ sub main {
 
           });
 
-      my $response = $network->send({message => $self->{inventory}});
+      my $response = $network->send({message => $inventory});
 
       return unless $response;
+      $inventory->saveLastState();
 
       my $parsedContent = $response->getParsedContent();
       if ($parsedContent
