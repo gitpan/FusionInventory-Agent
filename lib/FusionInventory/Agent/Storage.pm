@@ -5,6 +5,8 @@ use Storable;
 use strict;
 use warnings;
 
+use Config;
+
 use File::Glob ':glob';
 
 my $lock :shared;
@@ -48,6 +50,12 @@ sub new {
     my ( undef, $params ) = @_;
 
     my $self = {};
+
+    if ($Config{usethreads}) {
+        if (!(eval "use threads;1;" && eval "use threads::shared;1;")) {
+            print "[error]Failed to use threads!\n";
+        }
+    }
 
     my $config = $self->{config} = $params->{config};
     my $target = $self->{target} = $params->{target};
@@ -151,10 +159,20 @@ sub save {
     my $filePath = $self->getFilePath({ idx => $idx });
 #    print "[storage]save data in:". $filePath."\n";
 
+    my $isWindows = $^O =~ /^^MSWin/;
     my $oldMask = umask();
-    umask(077) or die "Can't restrict access to $filePath\n";
+
+    if (!$isWindows) {
+        umask(077) or die "Can't restrict access to $filePath\n";
+    } else {
+        print "TODO, restrict access to temp file!\n";
+}
+
 	store ($data, $filePath) or warn;
-    umask($oldMask) or die "Can't restore old mask\n";
+    
+    if (!$isWindows) {
+        umask($oldMask) or die "Can't restore old mask\n";
+    }
 
 }
 
@@ -167,6 +185,11 @@ substorage.
 sub restore {
     my ($self, $params ) = @_;
 
+    if ($params && ref($params) ne 'HASH') {
+        my ($package, $filename, $line) = caller;
+        print "[error]$package use a deprecated API for Storage. Please\n";
+        print "[error]Please upgrade it or remove $filename\n";
+    }
     my $module = $params->{module};
     my $idx = $params->{idx};
 
