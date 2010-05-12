@@ -21,6 +21,7 @@ recommends:
   File::Glob: 0
   File::Path: 0
   HTTP::Daemon: 0
+  MIME::Base64: 0
   Net::CUPS: 0
   Proc::Daemon: 0
   Proc::PID::File: 0
@@ -34,4 +35,4 @@ requires:
   perl: 5.6.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.0.4
+version: 2.0.5

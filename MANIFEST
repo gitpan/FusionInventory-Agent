@@ -1,5 +1,8 @@
 AUTHORS
 Changes
+contrib/fedora/fusioninventory-agent.cron
+contrib/fedora/fusioninventory-agent.init
+contrib/fedora/fusioninventory-agent.spec
 contrib/Tarballs.pm
 etc/cron.d/fusioninventory-agent
 etc/default/fusioninventory-agent
