@@ -44,13 +44,15 @@ package FusionInventory::Agent::Task::Inventory::Virtualization::Vmsystem;
 ##
 
 use strict;
+use version;
 
 sub isInventoryEnabled { 
   if ( can_run("zoneadm")){ # Is a solaris zone system capable ?
       return 1; 
   }
   if ( can_run ("dmidecode") ) { # 2.6 and under haven't -t parameter   
-    if ( `dmidecode -V 2>/dev/null` >= 2.7 ) {
+    if (version->parse(`dmidecode -V 2>/dev/null`) >= version->parse('v2.7') ) {
+
       return 1;
     }
   } 
@@ -77,17 +79,19 @@ sub doInventory {
         $found = 1;
     }
  
-    # paravirtualized oldstyle Xen - very simple ;)
-    if(-d '/proc/xen') {
-        $status = "Xen";
+    if (
+        -d '/proc/xen' ||
+        check_file_content(
+          '/sys/devices/system/clocksource/clocksource0/available_clocksource',
+          'xen'
+        )
+    ) {
         $found = 1 ;
-    }
-
-    # newstyle Xen
-    if($found == 0 and -r '/sys/devices/system/clocksource/clocksource0/available_clocksource') {
-        if(`cat /sys/devices/system/clocksource/clocksource0/available_clocksource` =~ /xen/) {
+        if (check_file_content('/proc/xen/capabilities', 'control_d')) {
+          # dom0 host
+        } else {
+          # domU PV host
           $status = "Xen";
-          $found = 1 ;
         }
     }
 
@@ -207,6 +211,24 @@ sub doInventory {
     $inventory->setHardware ({
       VMSYSTEM => $status,
       });
+}
+
+sub check_file_content {
+    my ($file, $pattern) = @_;
+
+    return 0 unless -r $file;
+
+    my $found = 0;
+    open (my $fh, '<', $file) or die "Can't open file $file: $!";
+    while (my $line = <$fh>) {
+        if ($line =~ /$pattern/) {
+            $found = 1;
+            last;
+        }
+    }
+    close ($fh);
+
+    return $found;
 }
 
 1;
