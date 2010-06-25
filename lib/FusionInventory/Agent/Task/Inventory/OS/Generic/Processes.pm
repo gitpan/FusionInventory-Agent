@@ -1,7 +1,13 @@
 package FusionInventory::Agent::Task::Inventory::OS::Generic::Processes;
-use strict;
 
-sub isInventoryEnabled {can_run("ps")}
+use strict;
+use warnings;
+
+use English qw(-no_match_vars);
+
+sub isInventoryEnabled {
+    return can_run("ps");
+}
 
 sub doInventory {
     my $params = shift;
@@ -25,8 +31,17 @@ sub doInventory {
     );
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
     my $the_year=$year+1900;
-    open(PS, "ps aux|");
-    while ($line = <PS>) {
+
+    my $command = $OSNAME eq 'solaris' ?
+        'ps -A -o user,pid,pcpu,pmem,vsz,rss,tty,s,stime,time,comm' : 'ps aux';
+
+    my $handle;
+    if (!open $handle, '-|', $command) {
+        warn "Can't run $command: $ERRNO";
+        return;
+    }
+
+    while ($line = <$handle>) {
         next if ($. ==1);
         if ($line =~
             /^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*?)\s*$/){
@@ -60,7 +75,7 @@ sub doInventory {
                 });
         }
     }
-    close(PS); 
+    close $handle; 
 }
 
 1;

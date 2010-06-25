@@ -1,13 +1,11 @@
 package FusionInventory::Agent::Task::Inventory::OS::MacOS;
 
 use strict;
+use warnings;
 
-sub isInventoryEnabled {
-	my $r;
-	# we check far darwin because that's the _real_ underlying OS
-	$r = 1 if (uc($^O) =~ /^DARWIN$/);
-	return($r);
-}
+use English qw(-no_match_vars);
+
+sub isInventoryEnabled { return $OSNAME =~ /^DARWIN$/i }
 
 sub doInventory {
         my $params = shift;

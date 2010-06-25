@@ -1,4 +1,125 @@
 Revision history for FusionInventory::Agent
+2.1_rc1 Sat, 26 Jun 2010 00:49:44 +0200
+       * Add Windows support for 2000/XP/2003/Vista/2008/Seven
+       * Windows: Add new values for SOFTWARES key
+       * Add Windows service
+       * disable --color for Windows for now
+       * Collect Solaris process informations (Emengao)
+       * VirtualMachine: Add Vserver.pm
+       * VirtualMachine: Check is the status is correct
+       * detect Slackware packages (David DURIEUX)
+       * Libvirt.pm switch SUBSYSTEM and VMTYPE values.VMTYPE is "libvirt"
+         now
+       * Better error handling if it's not possible to create basevardir
+       * Inventory: reduce the number of debug messages
+       * Add DRIVES/SYSTEMDRIVE to know if it's the system partition
+       * Inventory.pm, fix: addStorages is deprecred, not addStorage
+       * Inventory.pm, addSection() is now deprecated and a warning is
+         printed everytime the function is called
+       * Linux/PC/CPU: set CPU name and detect CORE/THREAD
+       * Stores environement variables
+       * Bios, add ENCLOSURESERIAL BASEBOARDSERIAL and BIOSSERIAL keys
+       * Identify USB devices (Windows, Linux)
+       * --realm was two time in --help
+       * LoggerBackend/Syslog.pm: fix https://bugs.launchpad.net/bugs/571655
+         (Guillaume Rousse)
+       * LoggerBackend/File.pm: don't reopen file descriptor for every new
+         message (Guillaume Rousse)
+       * Cups.pm: gets all installed printers and their drivers names
+        (Aurelien Bondis)
+       * ocsinventory-ng is not more the default server hostname, you've to
+         set it yourself in agent.cfg
+       * Inputs.pm: adds Inputs support for Linux clients (Aurelien Bondis)
+       * Turns off interactive mode of GNU fdisk (Aurelien Bondis)
+       * Add a few new PNP monitor IDs (Alex Mauer)
+       * Makefile.PL: Define Perl 5.8 as the minimal version.
+       * RPC: Add http://hostname:62354/status to get the current status of
+         the agent
+       * Add --rpc-trust-localhost
+       * RPC: serve a basic page to present the agent
+       * --html-dir parameter
+       * Linux/Domains. Use Sys::Hostname to get the domain
+       * Exit if no --server or --target is defined
+       * Inventory: If two modules with the same name are found, only load
+         the first
+       * Linux/Storages: detect floppy and block devices (Amir PAKDEL)
+       * Linux/Storages: don't attempt to run df on cdrom devices
+         (Guillaume Rousse)
+       * Linux/Storages: factorize redudant code for udev devices detection
+         (Guillaume Rousse)
+       * HP-UX numerous improvement (Amir PAKDEL)
+       * Add NETWORKS/SPEED (in MB/s) (Amir PAKDEL)
+       * HP-UX/Drives: Swapped "Type" and "File System" (Amir PAKDEL)
+       * Inventory: POD doc for NETWORKS part
+       * add --no-printer parameter
+       * BSD: don't use uname to get the OSName, but $^O aka $SNAME
+       * BSD: chomp() the number of CPU
+       * HP RAID disk detection is now in Generic directory and so, can be
+         used by Windows and probably HP-UX.
+       * Linux: use blkid to get the partition serial number
+       * Task: Add the Ping.pm module for debugging purpose
+       * HTTP::Daemon::get_request is not thread safe and must be called from
+         the master thread. The timeout is set at 5 seconds to avoid
+         blockage
+       * Linux: HP Integrated Lights-Out (iLO) (Management Interface of HP
+         ProLiant servers) (Amir PAKDEL)
+       * HP-UX: HP Management Processor (MP) (Management Interface of HP
+         Integrity servers) (Amir PAKDEL)
+       * Add --perl-bin-dir-in-path parameter for the Windows package
+       * Collect Batteries information
+       * Add --disable-perllib-envvar to be able to ignore PERLLIB and
+         PERL5LIB envvar
+       * turns off PERL5LIB envvar in win32-service
+       * Get CONTROLLERS/PCISUBSYSTEMID
+       * Simplify a lot Inventory.pm, add _addEntry() function
+       * Do not set CPU Id as MBoard serial number anymore
+       * XML: Only set the non empty field to decrease the final file
+         size and improve the performance
+       * Add a template config file in etc/agent.cfg
+       * Add --conf-file=XXX parameter to allow the user to use another
+         config file
+       * Fix, allow dash in key name in config file
+       * Rethink the script in ./tools, see ./tools/README
+       * Inventory: use encode('UTF-8', $string) to reencode to UTF-8
+         string detected invalide.
+       * print help messages on STDERR
+       * Linux: factorize redundant modules for non-LSB Linux distribution
+         identification (Guillaume Rousse)
+       * rewrite lshal and dmidecode parsing code for readability and
+         efficiency (Guillaume Rousse)
+       * don't test umask() result, it always succeed
+       * don't test Sys::Hostname availability, it's a core module
+       * RPC: ignore when socket::accept return an undef $socket
+       * RPC: display the date of the next inventory planned
+       * testing: test modules loading (Guillaume Rousse)
+       * testing: test PBP compliance (Guillaume Rousse)
+       * testing: test dmidecode and lshal parsing tests (Guillaume Rousse)
+       * code cleanup: ensure consistent 4-spaces indentation step everyhwere
+        (Guillaume Rousse)
+       * code cleanup: use strict and warning pragmas everywhere
+        (Guillaume Rousse)
+       * code cleanup: use lexical file handles (Guillaume Rousse)
+       * code cleanup: use 3-args open statement (Guillaume Rousse)
+       * code cleanup: use block-style eval statement (Guillaume Rousse)
+       * code cleanup: use english names for magic variables (Guillaume Rousse)
+       * code cleanup: use explicit return statement (Guillaume Rousse)
+       * code cleanup: ensure all opened file handles are proprely closed
+        (Guillaume Rousse)
+       * code cleanup: ensure all open failure are signaled to user with a
+         meaningful message (Guillaume Rousse)
+       * code cleanup: ensure object constructors can handle subclasses
+         (Guillaume Rousse)
+       * Linux/Storages: Rename addStorages to addStorage finally
+       * Add Virtuozzo support (Jan JUNGMANN)
+       * merge README file with the fusioninventory-agent POD documentation
+       * File::Find is required
+       * Add --html parameter
+       * Improve --help presentation
+
+2.0.7    Mon, 14 Jun 2010 18:09:27 +0200
+       * Avoid a warning if --stdout is used.
+       * print help messages on STDERR
+       * --wait: no need to wait before the final exit
 
 2.0.6    Fri, 28 May 2010 15:53:16 +0200
        * Fix DRIVES/CREATEDATE for ext* filesystem
@@ -8,10 +129,10 @@ Revision history for FusionInventory::Agent
          https://bugs.launchpad.net/bugs/585753
        * Fix dmidecode version comparaison
          https://bugs.launchpad.net/ocsinventory-unix-agent/+bug/586321
-         (Guillaume ROUSSE)
+         (Guillaume Rousse)
        * Mismatch between xen dom0 and xen PV host
          https://bugs.launchpad.net/ocsinventory-unix-agent/+bug/586337
-         (Guillaume ROUSSE)
+         (Guillaume Rousse)
 
 2.0.5    Wed, 12 May 2010 10:50:51 +0200
        * Don't use dmidecode with -t and -s parameter since it's not
@@ -55,6 +176,8 @@ Revision history for FusionInventory::Agent
        * --delaytime really read the parameter, thanks Walid NOUH
        * fix --no-socket
        * Fix a typo in fusioninventory-agent-config, logtotate (Girish NAVUDA)
+       * Fix: between two server query, really wait during a random period
+         still based on server PROLOG_FREQ
        * Do not load Crypt::SSLeay and IO::Socket::SSL at the same
        * POD doc, explain how to use more than one server
        * Fix: between two server query, really wait during a random period
@@ -318,7 +441,7 @@ Revision history for FusionInventory::Agent
        * Switch the XML content from ISO-8859-1 to UTF-8, BTW we force
          LC_ALL=C...
        * Fix the history flood in Download.pm (Pascal DANEK) 
-       	 https://sourceforge.net/tracker/index.php?func=detail&aid=2806585&group_id=58373&atid=487492
+         https://sourceforge.net/tracker/index.php?func=detail&aid=2806585&group_id=58373&atid=487492
        * Stores PCIID in CONTROLLERS/PCIID
        * Storage the monitor EDID string in BASE64 and UUENCODE
        * Linux: Storages: reorganize the code base and use lshal
@@ -567,8 +690,8 @@ Revision history for FusionInventory::Agent
        * do not create an inventory if the server doesnn't need it
        * new parameters for the backend modules (run and check functions):
          - prologresp, the Ocsinventory::Agent::XML::Response::Prolog object returned by
-	   the prolog
-	 - storage: an hashref stored on the harddrive at the end of the execution of the module
+           the prolog
+         - storage: an hashref stored on the harddrive at the end of the execution of the module
        * a backend module without a run function is accepted now 
        * Inventory.pm: add addIpDiscoverEntry() to add host from the same network
        * @runMeIfTheseChecksFailed: new optional setting for Backend module

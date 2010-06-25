@@ -7,10 +7,8 @@ use threads::shared;
 
 use FusionInventory::Agent::Target;
 
-use Data::Dumper;
-
 sub new {
-    my (undef, $params) = @_;
+    my ($class, $params) = @_;
 
     my $self = {};
 
@@ -21,9 +19,7 @@ sub new {
     $self->{targets} = [];
     $self->{targets} = [];
 
-
-
-    bless $self;
+    bless $self, $class;
 
     $self->init();
 
@@ -50,7 +46,7 @@ sub init {
 
 
     if ($config->{'stdout'}) {
-        my $target = new FusionInventory::Agent::Target({
+        my $target = FusionInventory::Agent::Target->new({
                 'logger' => $logger,
                 config => $config,
                 'type' => 'stdout',
@@ -62,7 +58,7 @@ sub init {
     }
 
     if ($config->{'local'}) {
-        my $target = new FusionInventory::Agent::Target({
+        my $target = FusionInventory::Agent::Target->new({
                 'config' => $config,
                 'logger' => $logger,
                 'type' => 'local',
@@ -84,7 +80,7 @@ sub init {
         } else {
             $url = $val;
         }
-        my $target = new FusionInventory::Agent::Target({
+        my $target = FusionInventory::Agent::Target->new({
                 'config' => $config,
                 'logger' => $logger,
                 'type' => 'server',
@@ -104,7 +100,9 @@ sub getNext {
     my $config = $self->{'config'};
     my $logger = $self->{'logger'};
 
-    if ($config->{'daemon'} or $config->{'daemonNoFork'}) {
+    return unless @{$self->{targets}};
+
+    if ($config->{'daemon'} or $config->{'daemon-no-fork'} or $config->{'winService'}) {
         while (1) {
             foreach my $target (@{$self->{targets}}) {
                 if (time > $target->getNextRunDate()) {
@@ -135,6 +133,12 @@ sub getNext {
     }
 
     return;
+}
+
+sub numberOfTargets {
+    my ($self) = @_;
+
+    return @{$self->{targets}}
 }
 
 sub resetNextRunDate {

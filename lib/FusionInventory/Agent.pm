@@ -1,12 +1,10 @@
-#!/usr/bin/perl
-
 package FusionInventory::Agent;
-
-use Cwd;
-use English;
 
 use strict;
 use warnings;
+
+use Cwd;
+use English qw(-no_match_vars);
 
 use File::Path;
 
@@ -15,13 +13,13 @@ use File::Path;
 use XML::Simple;
 use Sys::Hostname;
 
-our $VERSION = '2.0.6';
+our $VERSION = '2.1_rc1';
 $ENV{LC_ALL} = 'C'; # Turn off localised output for commands
 $ENV{LANG} = 'C'; # Turn off localised output for commands
 
 eval {XMLout("<a>b</a>");};
-if ($@){
-    no strict 'refs';
+if ($EVAL_ERROR) {
+    no strict 'refs'; ## no critic
     ${*{"XML::SAX::"}{HASH}{'parsers'}} = sub {
         return [ {
             'Features' => {
@@ -49,29 +47,36 @@ use FusionInventory::Agent::RPC;
 use FusionInventory::Agent::Targets;
 
 sub new {
-    my (undef, $self) = @_;
+    my ($class, $params) = @_;
 
+    my $self = {};
 ############################
 #### CLI parameters ########
 ############################
     my $config = $self->{config} = FusionInventory::Agent::Config::load();
+
+    if ($params->{winService}) {
+        $config->{winService} = 1;
+    }
 
     # TODO: should be in Config.pm
     if ($config->{logfile}) {
         $config->{logger} = 'File';
     }
 
-    my $logger = $self->{logger} = new FusionInventory::Logger ({
+    my $logger = $self->{logger} = FusionInventory::Logger->new({
             config => $config
         });
 
-# $< == $REAL_USER_ID
-    if ( $< ne '0' ) {
+    if ( $REAL_USER_ID != 0 ) {
         $logger->info("You should run this program as super-user.");
     }
 
-    if (!-d $config->{basevardir} && !mkpath($config->{basevardir})) {
-        $logger->error("Failed to create ".$config->{basevardir});
+    if (!-d $config->{basevardir} && !mkpath($config->{basevardir}, {error => undef})) {
+        $logger->error(
+            "Failed to create ".$config->{basevardir}.
+            " Please use --basevardir to point to a R/W directory."
+        );
     }
 
     if (not $config->{scanhomedirs}) {
@@ -83,16 +88,29 @@ sub new {
         $config->{nosoftware} = 1
     }
 
-
-    my $hostname = hostname; # Sys::Hostname
+    # This is a hack to add the perl binary directory
+    # in the $PATH env.
+    # This is useful for the Windows installer.
+    # You probably don't need this feature
+    if ($config->{'perl-bin-dir-in-path'}) {
+        if ($^X =~ /(^.*(\\|\/))/) {
+            $ENV{PATH} .= $Config::Config{path_sep}.$1;
+        } else {
+            $logger->error("Failed to parse $^X to get the directory for --perl-bin-dir-in-path");
+        }
+    }
+    my $hostname = hostname();
 
 # /!\ $rootStorage save/read data in 'basevardir', not in a target directory!
-    my $rootStorage = new FusionInventory::Agent::Storage({
+    my $rootStorage = FusionInventory::Agent::Storage->new({
         config => $config
     });
     my $myRootData = $rootStorage->restore();
 
-    if (!defined($myRootData->{previousHostname}) || defined($myRootData->{previousHostname}) &&  ($myRootData->{previousHostname} ne $hostname)) {
+    if (
+        !defined($myRootData->{previousHostname}) ||
+        $myRootData->{previousHostname} ne $hostname
+    ) {
         my ($YEAR, $MONTH , $DAY, $HOUR, $MIN, $SEC) = (localtime
             (time))[5,4,3,2,1,0];
         $self->{deviceid} =sprintf "%s-%02d-%02d-%02d-%02d-%02d-%02d",
@@ -112,7 +130,7 @@ sub new {
 
 
 ######
-    $self->{targets} = new FusionInventory::Agent::Targets({
+    $self->{targets} = FusionInventory::Agent::Targets->new({
 
             logger => $logger,
             config => $config,
@@ -121,13 +139,19 @@ sub new {
         });
     my $targets = $self->{targets};
 
+    if (!$targets->numberOfTargets()) {
+        $logger->error("No target defined. Please use ".
+            "--server=SERVER or --local=/directory");
+        exit 1;
+    }
+
     if ($config->{daemon}) {
 
         $logger->debug("Time to call Proc::Daemon");
 
         my $cwd = getcwd();
         eval { require Proc::Daemon; };
-        if ($@) {
+        if ($EVAL_ERROR) {
             print "Can't load Proc::Daemon. Is the module installed?";
             exit 1;
         }
@@ -144,7 +168,7 @@ sub new {
         chdir $cwd if $config->{devlib};
 
     }
-    $self->{rpc} = new FusionInventory::Agent::RPC ({
+    $self->{rpc} = FusionInventory::Agent::RPC->new({
           
             logger => $logger,
             config => $config,
@@ -154,8 +178,9 @@ sub new {
 
     $logger->debug("FusionInventory Agent initialised");
 
-    bless $self;
+    bless $self, $class;
 
+    return $self;
 }
 
 sub isAgentAlreadyRunning {
@@ -163,7 +188,7 @@ sub isAgentAlreadyRunning {
     my $logger = $params->{logger};
     # TODO add a workaround if Proc::PID::File is not installed
     eval { require Proc::PID::File; };
-    if(!$@) {
+    if(!$EVAL_ERROR) {
         $logger->debug('Proc::PID::File avalaible, checking for pid file');
         if (Proc::PID::File->running()) {
             $logger->debug('parent process already exists');
@@ -182,6 +207,7 @@ sub main {
     my $logger = $self->{logger};
     my $targets = $self->{targets};
     my $rpc = $self->{rpc};
+    $rpc->setCurrentStatus("waiting");
 
 
 
@@ -200,7 +226,7 @@ sub main {
         my $prologresp;
         if ($target->{type} eq 'server') {
 
-            my $network = new FusionInventory::Agent::Network ({
+            my $network = FusionInventory::Agent::Network->new({
 
                     logger => $logger,
                     config => $config,
@@ -208,7 +234,7 @@ sub main {
 
                 });
 
-            my $prolog = new FusionInventory::Agent::XML::Query::Prolog({
+            my $prolog = FusionInventory::Agent::XML::Query::Prolog->new({
 
                     accountinfo => $target->{accountinfo}, #? XXX
                     logger => $logger,
@@ -231,7 +257,7 @@ sub main {
         }
 
 
-        my $storage = new FusionInventory::Agent::Storage({
+        my $storage = FusionInventory::Agent::Storage->new({
 
                 config => $config,
                 logger => $logger,
@@ -250,27 +276,29 @@ sub main {
             });
 
 
-        my %taskOptions = (
-            Inventory => 'noinventory',
-            OcsDeploy => 'noocsdeploy',
-            WakeOnLan => 'nowakeonlan',
-            SNMPQuery => 'nosnmpquery',
-            NetDiscovery => 'nonetdiscovery'
-            );
+        my @tasks = qw/
+            Inventory
+            OcsDeploy
+            WakeOnLan
+            SNMPQuery
+            NetDiscovery
+            Ping
+            /;
 
-        foreach my $module (keys %taskOptions) {
-            my $task = new FusionInventory::Agent::Task({
+        foreach my $module (@tasks) {
+            my $task = FusionInventory::Agent::Task->new({
                     config => $config,
                     logger => $logger,
                     module => $module,
-                    name => $taskOptions{$module},
                     target => $target,
 
                 });
 
+            $rpc->setCurrentStatus("running task $module");
             next unless $task;
             $task->run();
         }
+        $rpc->setCurrentStatus("waiting");
 
         if (!$config->{debug}) {
             # In debug mode, I do not clean the FusionInventory-Agent.dump

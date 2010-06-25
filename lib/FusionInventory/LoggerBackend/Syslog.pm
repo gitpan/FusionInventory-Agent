@@ -1,33 +1,35 @@
 package FusionInventory::LoggerBackend::Syslog;
+
+use strict;
+use warnings;
 # Not tested yet!
 use Sys::Syslog qw( :DEFAULT setlogsock);
 
 sub new {
-  my (undef, $params) = @_;
+    my ($class, $params) = @_;
 
-  my $self = {};
+    my $self = {};
 
-  setlogsock('unix');
-  openlog("fusioninventory-agent", 'cons,pid', $ENV{'USER'});
-  syslog('debug', 'syslog backend enabled');
-  closelog();
+    openlog("fusinv-agent", 'cons,pid', $params->{config}->{logfacility});
 
-  bless $self;
+    bless $self, $class;
+    return $self;
 }
 
 sub addMsg {
+    my (undef, $args) = @_;
 
-  my (undef, $args) = @_;
+    my $level = $args->{level};
+    my $message = $args->{message};
 
-  my $level = $args->{level};
-  my $message = $args->{message};
+    return if $message =~ /^$/;
 
-  return if $message =~ /^$/;
-
-  openlog("fusioninventory-agent", 'cons,pid', $ENV{'USER'});
-  syslog('info', $message);
-  closelog();
-
+    syslog('info', $message);
 }
+
+sub DESTROY {
+    closelog();
+}
+
 
 1;

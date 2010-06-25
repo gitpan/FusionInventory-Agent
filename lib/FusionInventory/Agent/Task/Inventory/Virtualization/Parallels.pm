@@ -1,8 +1,11 @@
 package FusionInventory::Agent::Task::Inventory::Virtualization::Parallels;
 
 use strict;
+use warnings;
 
-sub isInventoryEnabled { return can_run('prlctl') }
+sub isInventoryEnabled {
+    return can_run('prlctl');
+}
 
 sub doInventory {
     my $params = shift;
@@ -26,7 +29,7 @@ sub doInventory {
     my @users = ();
 
     # We don't want to scan user directories unless --scan-homedirs is used
-    return unless $config->{scanhomedirs};
+    return unless $config->{'scan-homedirs'};
 
     foreach my $lsuser ( glob("/Users/*") ) {
         $lsuser =~ s/.*\///; # Just keep the login
@@ -68,7 +71,7 @@ sub doInventory {
                 UUID      => $uuid,
                 MEMORY    => $mem,
                 STATUS    => $status,
-                SUBSYSTEM => "",
+                SUBSYSTEM => "Parallels",
                 VMTYPE    => "Parallels",
             });
     }

@@ -1,5 +1,7 @@
 package FusionInventory::Agent::Task::Inventory::OS::MacOS::Printers;
+
 use strict;
+use warnings;
 
 use constant DATATYPE => 'SPPrintersDataType';
 
@@ -12,6 +14,9 @@ sub isInventoryEnabled {
 sub doInventory {
     my $params = shift;
     my $inventory = $params->{inventory};
+    my $config = $params->{config};
+
+    return if $config->{'no-printer'};
 
     my $pro = Mac::SysProfile->new();
     my $h = $pro->gettype(DATATYPE());
