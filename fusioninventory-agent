@@ -309,12 +309,6 @@ With this option, the agent ignore the server anwser and send an inventory.
 
 Save the local inventory requested by B<--local> in HTML.
 
-=item B<--html-directory>
-
-Alternative directory where the static HTML are stored. You probably don't
-need this option unless you don't want to use the Makefile.PL installation
-procedure or if File::ShareDir is not avalaible.
-
 =item B<-i>, B<--info>
 
 Turn the verbose mode on. The flag is ignored if B<--debug> is enable.
@@ -332,6 +326,32 @@ Write an inventory in the I<DIR> directory. A new file will be created if needed
 =item B<--logfile>=I<FILE>
 
 Log message in I<FILE> and turn off STDERR
+
+=item B<--logger>=I<LOGGER:>
+
+The logger you want to use. It can be:
+
+=over 4
+
+=item
+
+Stderr: print the messages directly in the console. Messages are lost in
+daemon mode (B<--daemon>). You can use B<--color> to turn color mode on.
+
+=item
+
+File: log the error in a log file. Please use B<--logfile> to set the
+location of your log file. B<--logfile> turns this option on automatically
+
+=item
+
+Syslog: use the local syslog server to log the messages.
+
+=back
+
+You can use more than one parameter if you use ',' as delimiter. E.g:
+
+ % fusioinventory-agent --logger=Syslog,Stderr --local=/tmp
 
 =item B<--no-ocsdeploy>
 
@@ -398,6 +418,12 @@ You can declare more than one server if you use the ',' delimiter.
 
 B<--server> is ignored if B<--local> is in use.
 
+=item B<--share-dir>
+
+The directory where a stored the shared files. You probably don't
+need this option unless you don't want to use the Makefile.PL installation
+procedure or if File::ShareDir is not avalaible.
+
 =item B<--stdout>
 
 Print the inventory on stdout.
@@ -422,6 +448,8 @@ in order to centralize the administration of the machine.
 
 Do now validate HTTPS certificat with the servers. Please never use this
 option in production. This is just a very bad idea.
+
+Hint: you can declare HTTPS_DEBUG to get SSL error messages in the console.
 
 =item B<--perl-bin-dir-in-path>
 

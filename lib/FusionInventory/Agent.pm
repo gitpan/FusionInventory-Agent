@@ -8,15 +8,15 @@ use English qw(-no_match_vars);
 
 use File::Path;
 
-# THIS IS AN UGLY WORKAROUND FOR
-# http://rt.cpan.org/Ticket/Display.html?id=38067
 use XML::Simple;
 use Sys::Hostname;
 
-our $VERSION = '2.1_rc1';
+our $VERSION = '2.1_rc2';
 $ENV{LC_ALL} = 'C'; # Turn off localised output for commands
 $ENV{LANG} = 'C'; # Turn off localised output for commands
 
+# THIS IS AN UGLY WORKAROUND FOR
+# http://rt.cpan.org/Ticket/Display.html?id=38067
 eval {XMLout("<a>b</a>");};
 if ($EVAL_ERROR) {
     no strict 'refs'; ## no critic
@@ -61,7 +61,7 @@ sub new {
 
     # TODO: should be in Config.pm
     if ($config->{logfile}) {
-        $config->{logger} = 'File';
+        $config->{logger} .= ',File';
     }
 
     my $logger = $self->{logger} = FusionInventory::Logger->new({
@@ -86,6 +86,11 @@ sub new {
     if ($config->{nosoft}) {
         $logger->info("the parameter --nosoft is deprecated and may be removed in a future release, please use --nosoftware instead.");
         $config->{nosoftware} = 1
+    }
+
+    if (!-d $config->{'share-dir'}) {
+        $logger->error("share-dir doesn't existe ".
+            "(".$config->{'share-dir'}.")");
     }
 
     # This is a hack to add the perl binary directory

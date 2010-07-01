@@ -95,21 +95,23 @@ sub _addEntry {
     my $showAll = 0;
 
     foreach (@$fields) {
-        if (!$showAll && !$values->{$_}) {
+        if (!$showAll && !defined($values->{$_})) {
             next;
         }
-        my $string = $self->_encode({ string => $values->{$_} }) || '';
+        my $string = $self->_encode({ string => $values->{$_} });
         $newEntry->{$_}[0] = $string;
     }
 
 # Don't create two time the same device
-    ENTRY: foreach my $entry (@{$self->{h}{CONTENT}{$sectionName}}) {
-        foreach (@$fields) {
-            next ENTRY unless defined($entry->{$_}[0]) && 
-            defined($newEntry->{$_}[0]);
-            next ENTRY if $entry->{$_}[0] ne $newEntry->{$_}[0];
+    if ($noDuplicated) {
+        ENTRY: foreach my $entry (@{$self->{h}{CONTENT}{$sectionName}}) {
+            foreach (@$fields) {
+                next ENTRY unless defined($entry->{$_}[0]) && 
+                defined($newEntry->{$_}[0]);
+                next ENTRY if $entry->{$_}[0] ne $newEntry->{$_}[0];
+            }
+            return;
         }
-        return;
     }
 
     push @{$self->{h}{CONTENT}{$sectionName}}, $newEntry;
@@ -121,7 +123,7 @@ sub _encode {
 
     my $string = $params->{string};
 
-    return unless $string;
+    return unless defined($string);
 
     my $logger = $self->{logger};
 
@@ -171,6 +173,7 @@ sub addController {
     my ($self, $args) = @_;
 
     my @fields = qw/
+        CAPTION
         DRIVER
         NAME
         MANUFACTURER
@@ -179,6 +182,7 @@ sub addController {
         PCISUBSYSTEMID
         PCISLOT
         TYPE
+        REV
     /;
 
     $self->_addEntry({
@@ -860,7 +864,7 @@ USB device
 sub addUSBDevice {
     my ($self, $args) = @_;
 
-    my @fields = qw/VENDORID PRODUCTID SERIAL/;
+    my @fields = qw/VENDORID PRODUCTID SERIAL CLASS SUBCLASS NAME/;
 
     $self->_addEntry({
         'field' => \@fields,
@@ -1402,6 +1406,10 @@ The optional asset tag for this machine.
 
 =over 4
 
+=item CAPTION
+
+Windows CAPTION field or subsystem Name from the pci.ids table
+
 =item DRIVER
 
 =item NAME
@@ -1426,6 +1434,10 @@ The PCI slot, e.g: 00:02.1 (only for PCI device)
 
 The controller revision, e.g: rev 02. This field may be renamed
 in the future.
+
+=item REV
+
+Revision of the device in the XX format (e.g: 04)
 
 =back
 
@@ -1487,7 +1499,7 @@ The name of the CPU, e.g: Intel(R) Core(TM)2 Duo CPU     P8600  @ 2.40GHz
 
 =item THREAD
 
-Number of thread.
+Number of thread per core.
 
 =item SERIAL
 
@@ -1571,6 +1583,8 @@ Service Pack on Windows, kernel build date on Linux
 Deprecated, OCS only.
 
 =item PROCESSORT
+
+Deprecated, OCS only.
 
 =item NAME
 
@@ -1848,7 +1862,7 @@ E.g: VmWare ESX
 
 =item VMTYPE
 
-The name of the virtualisation system family, eg. Xen or VmWare.
+The name of the virtualisation system family. The same type found is HARDWARE/VMSYSTEM
 
 =item VCPU
 
@@ -1931,6 +1945,10 @@ USB Class (e.g: 8 for Mass Storage)
 =item SUBCLASS
 
 USB Sub Class
+
+=item NAME
+
+The name of the device (optional)
 
 =back
 
@@ -2052,6 +2070,35 @@ ErrStatus: See Win32_Printer.ExtendedDetectedErrorState
 
 =back
 
+=head2 PROCESSES
+
+=item USER
+
+The process owner
+
+=item PID
+
+The process Id
+
+=item CPUUSAGE
+
+The CPU usage.
+
+=item MEM
+
+The memory.
+
+=item VIRTUALMEMORY
+
+=item TTY
+
+=item STARTED
+
+When the process'd been started in the YYYY/MM/DD HH:MM format
+
+=item CMD
+
+The command.
 
 =head2 ANTIVIRUS
 
