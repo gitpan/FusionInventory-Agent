@@ -21,6 +21,7 @@ package FusionInventory::Agent::Task::Inventory::OS::Generic::Screen;
 use strict;
 use warnings;
 
+use Carp;
 use English qw(-no_match_vars);
 
 sub isInventoryEnabled {
@@ -37,13 +38,14 @@ sub getScreens {
 
 
     if ($OSNAME eq 'MSWin32') {
+        my $Registry;
         eval {
             require FusionInventory::Agent::Task::Inventory::OS::Win32;
             require Win32::TieRegistry;
             Win32::TieRegistry->import(
-                Access      => "KEY_READ",
-                Delimiter   => "/",
-                ArrayValues => 0
+                Delimiter   => '/',
+                ArrayValues => 0,
+                TiedRef     => \$Registry
             );
         };
         if ($EVAL_ERROR) {
@@ -58,22 +60,25 @@ sub getScreens {
         my $colItems = $objWMIService->ExecQuery("SELECT * FROM Win32_DesktopMonitor", "WQL",
                 wbemFlagReturnImmediately | wbemFlagForwardOnly);
 
-        foreach my $objItem
-(FusionInventory::Agent::Task::Inventory::OS::Win32::getWmiProperties('Win32_DesktopMonitor',
-                    qw/
-                    Caption
-                    PNPDeviceID
-                    /)) {
+        foreach my $objItem (getWmiProperties('Win32_DesktopMonitor', qw/
+            Caption PNPDeviceID
+        /)) {
 
             next unless $objItem->{"PNPDeviceID"};
             my $name = $objItem->{"Caption"};
 
-            my $a= $Win32::TieRegistry::Registry->Open( "LMachine", {Access=>"KEY_READ",Delimiter=>"/"} )
-                or  die "Can't open HKEY_LOCAL_MACHINE key: EXTENDED_OS_ERROR\n";
+            my $machKey;
+            {
+                no strict;
+                # Avoid this error on non-Windows OS
+                # Bareword "Win32::TieRegistry::KEY_READ" not allowed while "strict subs"
+                my $machKey = $Registry->Open('LMachine', {
+                        Access=> Win32::TieRegistry::KEY_READ
+                    } ) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
+            }
 
             my $edid =
-$a->{'SYSTEM/CurrentControlSet/Enum/'.$objItem->{"PNPDeviceID"}.'/Device
-Parameters/EDID'} || '';
+                $machKey->{"SYSTEM/CurrentControlSet/Enum/$objItem->{PNPDeviceID}/Device Parameters/EDID"} || '';
             $edid =~ s/^\s+$//;
 
             push @raw_edid, { name => $name, edid => $edid };
@@ -541,7 +546,7 @@ sub print_edid {
     foreach my $h (@{$edid->{detailed_timings}}) {
         print "\n";
         print "\t", $h->{ModeLine_comment}, $h->{bad_ratio} ? ' (bad ratio)' : '', "\n";
-        print "\tModeLine ", $h->{ModeLine}, "\n";	
+        print "\tModeLine ", $h->{ModeLine}, "\n";      
     }
 }
 

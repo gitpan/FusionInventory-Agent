@@ -3,17 +3,20 @@ package FusionInventory::Agent::Task::Inventory::OS::Win32::User;
 use strict;
 use warnings;
 
-use FusionInventory::Agent::Task::Inventory::OS::Win32;
-
-use Win32::OLE::Variant;
-
-use Encode qw(encode);
-
 use constant wbemFlagReturnImmediately => 0x10;
 use constant wbemFlagForwardOnly => 0x20;
 
+use Carp;
+use Encode qw(encode);
+use English qw(-no_match_vars);
+use Win32::OLE::Variant;
+use Win32::TieRegistry (
+    Delimiter   => '/',
+    ArrayValues => 0,
+    qw/KEY_READ/
+);
 
-use Win32::TieRegistry ( Delimiter=>"/", ArrayValues=>0 );
+use FusionInventory::Agent::Task::Inventory::OS::Win32;
 
 sub isInventoryEnabled {
     return 1;
@@ -33,23 +36,21 @@ sub doInventory {
 
         next unless $cmdLine;
  
-        if ($cmdLine =~ /\\Explorer\.exe/i) {
+        if ($cmdLine =~ /\\Explorer\.exe$/i) {
             my $name = Variant (VT_BYREF | VT_BSTR, '');
             my $domain = Variant (VT_BYREF | VT_BSTR, '');
     
             $objItem->GetOwner($name, $domain);
-    
-    
-           if (Win32::GetOSName() ne 'Win7') {
-               $name = encode("UTF-8", $name);
-               $domain = encode("UTF-8", $domain);
-           }
-            $inventory->addUser({ LOGIN => $name, DOMAIN => $domain });
+   
+            $inventory->addUser({ LOGIN => $name->Get(), DOMAIN => $domain->Get() });
         }
     
     }
 
-    my $machKey= $Registry->Open( "LMachine", {Access=>Win32::TieRegistry::KEY_READ(),Delimiter=>"/"} );
+    my $machKey = $Registry->Open('LMachine', {
+        Access => KEY_READ
+    }) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
+
     foreach (
         "SOFTWARE/Microsoft/Windows NT/CurrentVersion/Winlogon/DefaultUserName",
         "SOFTWARE/Microsoft/Windows/CurrentVersion/Authentication/LogonUI/LastLoggedOnUser"

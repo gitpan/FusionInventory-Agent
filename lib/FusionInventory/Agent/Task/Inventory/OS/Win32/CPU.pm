@@ -1,19 +1,30 @@
 package FusionInventory::Agent::Task::Inventory::OS::Win32::CPU;
 
-use FusionInventory::Agent::Task::Inventory::OS::Win32;
 use strict;
+use warnings;
 
-use Win32::TieRegistry ( Delimiter=>"/", ArrayValues=>0 );
+use constant KEY_WOW64_64KEY => 0x100;
+
+use Carp;
+use English qw(-no_match_vars);
+use Win32::TieRegistry (
+    Delimiter   => '/',
+    ArrayValues => 0,
+    qw/KEY_READ/
+);
+
+use FusionInventory::Agent::Task::Inventory::OS::Win32;
 
 # the CPU description in WMI is false, we use the registry instead
 # Hardware\Description\System\CentralProcessor\1
 # thank you Nicolas Richard 
 sub getCPUInfoFromRegistry {
     my ($cpuId) = @_;
-    
-    my $KEY_WOW64_64KEY = 0x100; 
+     
 
-    my $machKey= $Registry->Open( "LMachine", {Access=>Win32::TieRegistry::KEY_READ()|$KEY_WOW64_64KEY,Delimiter=>"/"} );
+    my $machKey= $Registry->Open('LMachine', {
+        Access=> KEY_READ | KEY_WOW64_64KEY
+    }) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
 
     my $data =
         $machKey->{"Hardware/Description/System/CentralProcessor/".$cpuId};
@@ -68,9 +79,9 @@ sub doInventory {
 
 
     my $cpuId = 0;
-    foreach my $Properties
-        (getWmiProperties('Win32_Processor',
-qw/NumberOfCores ProcessorId MaxClockSpeed/)) {
+    foreach my $Properties (getWmiProperties('Win32_Processor', qw/
+        NumberOfCores ProcessorId MaxClockSpeed
+    /)) {
 
         my $info = getCPUInfoFromRegistry($cpuId);
 
@@ -93,24 +104,32 @@ qw/NumberOfCores ProcessorId MaxClockSpeed/)) {
 
         $vmsystem = "QEMU"if $name =~ /QEMU/i;
 
-        $inventory->addCPU({
-#                CACHE => $cache,
-                CORE => $core,
-                DESCRIPTION => $description,
-                NAME => $name,
-                MANUFACTURER => $manufacturer,
-                SERIAL => $serial,
-                SPEED => $speed
+        if ($name =~ /([\d\.]+)s*(GHZ)/i) {
+            $speed = {
+               ghz => 1000,
+               mhz => 1,
+            }->{lc($2)}*$1;
+        }
 
-                });
+
+
+        $inventory->addCPU({
+#           CACHE => $cache,
+            CORE => $core,
+            DESCRIPTION => $description,
+            NAME => $name,
+            MANUFACTURER => $manufacturer,
+            SERIAL => $serial,
+            SPEED => $speed
+        });
 
         $cpuId++;
     }
 
     if ($vmsystem) {
         $inventory->setHardware ({
-                VMSYSTEM => $vmsystem 
-                });
+            VMSYSTEM => $vmsystem 
+        });
     }
 
 

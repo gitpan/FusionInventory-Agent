@@ -327,6 +327,12 @@ Write an inventory in the I<DIR> directory. A new file will be created if needed
 
 Log message in I<FILE> and turn off STDERR
 
+=item B<--logfile-maxsize>=I<FILE>
+
+Max logfile size in MB, default is unlimited. When the max size is reached, the
+file is truncated. This is only useful if there is no log rotation mechanism on
+the system.
+
 =item B<--logger>=I<LOGGER:>
 
 The logger you want to use. It can be:
@@ -450,12 +456,6 @@ Do now validate HTTPS certificat with the servers. Please never use this
 option in production. This is just a very bad idea.
 
 Hint: you can declare HTTPS_DEBUG to get SSL error messages in the console.
-
-=item B<--perl-bin-dir-in-path>
-
-A the directory where the perl binary is in the $PATH. You probably don't
-need this feature, that's why it's not listed in --help menu. It is only
-used by the Windows installer.
 
 =item B<-u> I<USER>, B<--user>=I<USER>
 

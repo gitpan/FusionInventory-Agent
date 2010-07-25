@@ -105,16 +105,24 @@ sub _addEntry {
 # Don't create two time the same device
     if ($noDuplicated) {
         ENTRY: foreach my $entry (@{$self->{h}{CONTENT}{$sectionName}}) {
-            foreach (@$fields) {
-                next ENTRY unless defined($entry->{$_}[0]) && 
-                defined($newEntry->{$_}[0]);
-                next ENTRY if $entry->{$_}[0] ne $newEntry->{$_}[0];
+            foreach my $field (@$fields) {
+                if (defined($entry->{$field}[0]) !=
+                    defined($newEntry->{$field}[0])) {
+                    next ENTRY;
+
+                }
+
+                if (defined($entry->{$field}[0]) && ($entry->{$field}[0] ne $newEntry->{$field}[0])) {
+                    next ENTRY;
+                }
             }
             return;
         }
     }
 
     push @{$self->{h}{CONTENT}{$sectionName}}, $newEntry;
+
+    return 1;
 
 }
 
@@ -614,7 +622,7 @@ sub setBios {
 
     foreach my $key (qw/SMODEL SMANUFACTURER SSN BDATE BVERSION BMANUFACTURER
         MMANUFACTURER MSN MMODEL ASSETTAG ENCLOSURESERIAL BASEBOARDSERIAL
-        BIOSSERIAL/) {
+        BIOSSERIAL TYPE/) {
 
         if (exists $args->{$key}) {
             my $string = $self->_encode({ string => $args->{$key} });
@@ -646,7 +654,7 @@ sub addCPU {
         'field' => \@fields,
         'sectionName' => 'CPUS',
         'values' => $args,
-        'noDuplicated' => 1
+        'noDuplicated' => 0
     });
 
     # For the compatibility with HARDWARE/PROCESSOR*
@@ -675,10 +683,9 @@ sub addUser {
         DOMAIN
     /;
 
-    my $values = $args;
-    return unless $values->{login};
+    return unless $args->{LOGIN};
 
-    $self->_addEntry({
+    return unless $self->_addEntry({
         'field' => \@fields,
         'sectionName' => 'USERS',
         'values' => $args,
@@ -694,7 +701,7 @@ sub addUser {
     $domainString .= '/' if $domainString;
 
     my $login = $args->{LOGIN}; 
-    my $domain = $args->{DOMAIN}; 
+    my $domain = $args->{DOMAIN} || '';
 # TODO: I don't think we should change the parmater this way. 
     if ($login =~ /(.*\\|)(\S+)/) {
         $domainString .= $domain;
@@ -733,6 +740,7 @@ sub addPrinter {
         SERVERNAME
         SHARENAME
         PRINTPROCESSOR
+        SERIAL
     /;
 
     $self->_addEntry({
@@ -1728,9 +1736,7 @@ The disk size in MB.
 
 =item TYPE
 
-INTERFACE can be SCSI/HDC/IDE/USB/1394
-(See: Win32_DiskDrive / InterfaceType in MSDN documentation
-
+INTERFACE can be SCSI/HDC/IDE/USB/1394/Serial-ATA
 
 =item SERIAL
 

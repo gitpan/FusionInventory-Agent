@@ -4,6 +4,8 @@ contrib/fedora/fusioninventory-agent.cron
 contrib/fedora/fusioninventory-agent.init
 contrib/fedora/fusioninventory-agent.spec
 contrib/fedora/README
+contrib/FusionInventory.adml
+contrib/FusionInventory.admx
 contrib/Tarballs.pm
 etc/cron.d/fusioninventory-agent
 etc/default/fusioninventory-agent
@@ -185,6 +187,7 @@ lib/FusionInventory/Agent/Task/Inventory/OS/Solaris/Users.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/AntiVirus.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Bios.pm
+lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Chassis.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Controller.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/CPU.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Drives.pm
@@ -201,6 +204,7 @@ lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Storages.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/USB.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/User.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Video.pm
+lib/FusionInventory/Agent/Task/Inventory/Virtualization/Hpvm.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Libvirt.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Parallels.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Qemu.pm
@@ -236,6 +240,7 @@ memconf
 META.yml
 resources/cpuinfo/cpuinfo-vmware-esx
 resources/cpuinfo/linux-686-1
+resources/cpuinfo/linux-686-samsung-nc10-1
 resources/cpuinfo/linux-alpha-1
 resources/cpuinfo/linux-armel-1
 resources/cpuinfo/linux-ia64-1
@@ -253,6 +258,9 @@ resources/dmidecode.rhel.3.4
 resources/dmidecode.rhel.4.3
 resources/dmidecode.rhel.4.6
 resources/hal/dell-xt2
+resources/osx/system_profiler_datatypes
+resources/osx/system_profiler_full_10.5-powerpc.txt
+resources/osx/system_profiler_full_10.6-intel.txt
 resources/udev/ssd
 share/html/favicon.ico
 share/html/index.tpl
@@ -266,5 +274,8 @@ t/drives.t
 t/inventory-xml.t
 t/modules.t
 t/storages.t
+t/xml-query-inventory.t
+t/xml-query-simplemessage.t
+t/xml-response.t
 THANKS
 tools/refresh-doc.sh

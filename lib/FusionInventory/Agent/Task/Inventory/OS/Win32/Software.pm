@@ -3,15 +3,22 @@ package FusionInventory::Agent::Task::Inventory::OS::Win32::Software;
 use strict;
 use warnings;
 
-use Config;
+use constant KEY_WOW64_64KEY => 0x100; 
+use constant KEY_WOW64_32KEY => 0x200; 
 
+use Carp;
+use Config;
+use English qw(-no_match_vars);
 use Win32;
 use Win32::OLE('in');
 use Win32::OLE::Variant;
+use Win32::TieRegistry (
+    Delimiter   => '/',
+    ArrayValues => 0,
+    qw/KEY_READ/
+);
 
 use FusionInventory::Agent::Task::Inventory::OS::Win32;
-
-use Win32::TieRegistry ( Delimiter=>"/", ArrayValues=>0 );
 
 sub isInventoryEnabled {
     return 1;
@@ -76,30 +83,29 @@ sub processSoftwares {
         my $versionMinor = hexToDec($data->{'/VersionMinor'});
         my $versionMajor = hexToDec($data->{'/VersionMajor'});
 
-
         if ($data->{'/NoRemove'}) {
             $noRemove = ($data->{'/NoRemove'} =~ /1/)?1:0;
         }
 
         $inventory->addSoftware ({
-                COMMENTS => $comments,
+            COMMENTS => $comments,
 #            FILESIZE => $filesize,
 #            FOLDER => $folder,
-                FROM => "registry",
-                HELPLINK => $helpLink,
-                INSTALLDATE => $installDate,
-                NAME => $name,
-                NOREMOVE => $noRemove,
-                RELEASETYPE => $releaseType,
-                PUBLISHER => $publisher,
-                UNINSTALL_STRING => $uninstallString,
-                URL_INFO_ABOUT => $urlInfoAbout,
-                VERSION => $version,
-                VERSION_MINOR => $versionMinor,
-                VERSION_MAJOR => $versionMajor,
-                IS64BIT => $is64bit,
-                GUID => $guid,
-                });
+            FROM => "registry",
+            HELPLINK => $helpLink,
+            INSTALLDATE => $installDate,
+            NAME => $name,
+            NOREMOVE => $noRemove,
+            RELEASETYPE => $releaseType,
+            PUBLISHER => $publisher,
+            UNINSTALL_STRING => $uninstallString,
+            URL_INFO_ABOUT => $urlInfoAbout,
+            VERSION => $version,
+            VERSION_MINOR => $versionMinor,
+            VERSION_MAJOR => $versionMajor,
+            IS64BIT => $is64bit,
+            GUID => $guid,
+        });
     }
 }
 
@@ -115,31 +121,31 @@ sub doInventory {
     my $Config;
 
     my $is64bit;
-    foreach my $Properties
-        (getWmiProperties('Win32_Processor',
-                          qw/AddressWidth/)) {
-            if ($Properties->{AddressWidth} eq 64) {
-                $is64bit = 1;
-            }
-
+    foreach my $Properties (getWmiProperties('Win32_Processor', qw/
+        AddressWidth
+    /)) {
+        if ($Properties->{AddressWidth} eq 64) {
+            $is64bit = 1;
         }
-
-
+    }
 
     if ($is64bit) {
 
+        # I don't know why but on Vista 32bit, KEY_WOW64_64KEY is able to read
+        # 32bit entries. This is not the case on Win2003 and if I correctly
+        # understand MSDN, this sounds very odd
 
-# I don't know why but on Vista 32bit, KEY_WOW64_64KEY is able to read 32bit
-# entries. This is not the case on Win2003 and if I correctly understand
-# MSDN, this sounds very odd
-
-        my $machKey64bit= $Registry->Open( "LMachine", {Access=>Win32::TieRegistry::KEY_READ()|$KEY_WOW64_64KEY,Delimiter=>"/"} );
+        my $machKey64bit = $Registry->Open('LMachine', {
+            Access => KEY_READ | KEY_WOW64_64KEY
+        }) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
 
         my $softwares=
             $machKey64bit->{"SOFTWARE/Microsoft/Windows/CurrentVersion/Uninstall"};
         processSoftwares({ inventory => $inventory, softwares => $softwares, is64bit => 1});
 
-        my $machKey32bit= $Registry->Open( "LMachine", {Access=>Win32::TieRegistry::KEY_READ()|$KEY_WOW64_32KEY,Delimiter=>"/"} );
+        my $machKey32bit = $Registry->Open('LMachine', {
+            Access => KEY_READ | KEY_WOW64_32KEY
+        }) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
 
         $softwares=
             $machKey32bit->{"SOFTWARE/Microsoft/Windows/CurrentVersion/Uninstall"};
@@ -147,7 +153,9 @@ sub doInventory {
         processSoftwares({ inventory => $inventory, softwares => $softwares, is64bit => 0});
 
     } else {
-        my $machKey= $Registry->Open( "LMachine", {Access=>Win32::TieRegistry::KEY_READ(),Delimiter=>"/"} );
+        my $machKey = $Registry->Open('LMachine', {
+            Access => KEY_READ()
+        }) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
 
         my $softwares=
             $machKey->{"SOFTWARE/Microsoft/Windows/CurrentVersion/Uninstall"};

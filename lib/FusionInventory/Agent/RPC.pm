@@ -38,8 +38,8 @@ sub new {
     my $logger = $self->{logger};
 
     if (!$Config{usethreads}) {
-      $logger->debug("threads support is need for RPC"); 
-      return;
+        $logger->debug("threads support is need for RPC"); 
+        return;
     }
 
 
@@ -48,21 +48,29 @@ sub new {
     } elsif ($config->{'devlib'}) {
         $self->{htmlDir} = "./share/html";
     }
-    $logger->debug("[RPC] static files are in ".$self->{htmlDir});
+    if ($self->{htmlDir}) {
+        $logger->debug("[RPC] static files are in ".$self->{htmlDir});
+    } else {
+        $logger->debug("[RPC] No static files directory");
+    }
 
 
     my $storage = $self->{storage} = FusionInventory::Agent::Storage->new({
-            target => {
-                vardir => $config->{basevardir},
-            }
-        });
+        target => {
+            vardir => $config->{basevardir},
+        }
+    });
 
     bless $self, $class;
 
     return $self if $config->{'no-socket'};
 
     $SIG{PIPE} = 'IGNORE';
-    if ($config->{daemon} || $config->{'daemon-no-fork'} || $config->{winService}) {
+    if (
+        $config->{daemon}           ||
+        $config->{'daemon-no-fork'} ||
+        $config->{winService}
+    ) {
         $self->{thr} = threads->create('server', $self);
     }
 
@@ -96,7 +104,13 @@ sub handler {
         foreach my $target (@{$targets->{targets}}) {
             my $path = $target->{'path'};
             $path =~ s/(http|https)(:\/\/)(.*@)(.*)/$1$2$4/;
-            $nextContact .= "<li>".$target->{'type'}.', '.$path.": ".localtime($target->getNextRunDate())."</li>\n";
+            my $timeString;
+            if ($target->getNextRunDate() > 1) {
+                $timeString = localtime($target->getNextRunDate());
+            } else {
+                $timeString = "now";
+            }
+            $nextContact .= "<li>".$target->{'type'}.', '.$path.": ".$timeString."</li>\n";
         }
 
         my $indexFile = $htmlDir."/index.tpl";
@@ -191,37 +205,44 @@ sub server {
         $daemon = $self->{daemon} = HTTP::Daemon->new(
             LocalAddr => $config->{'rpc-ip'},
             LocalPort => 62354,
-            Reuse => 1,
-            Timeout => 5);
+            Reuse     => 1,
+            Timeout   => 5
+        );
     } else {
         $daemon = $self->{daemon} = HTTP::Daemon->new(
             LocalPort => 62354,
-            Reuse => 1,
-            Timeout => 5);
+            Reuse     => 1,
+            Timeout   => 5
+        );
     }
   
-   if (!$daemon) {
+    if (!$daemon) {
         $logger->error("Failed to start the RPC server");
         return;
-   } 
+    } 
     $logger->info("RPC service started at: ". $daemon->url);
 
-    my @stack;
+# Since perl 5.10, threads::joinable is avalaible
+    my $joinableAvalaible = eval 'defined(threads::joinable) && 1';
+
     while (1) {
-        # Limit to 10 the max number of running thread
-        LIMIT: while (@stack > 10) {
-            foreach (0..@stack-1) {
-                my $thr = $stack[$_];
-                # is_joinable is not avalaible on perl 5.8
-                if (eval {$thr->is_joinable();1;}) {
-                    $thr->join();
-                    splice(@stack, $_, 1);
-                    last LIMIT;
-                }
-            }
-            # This is the plan B
-            my $thr = shift(@stack);
-            $thr->join();
+
+        if ($joinableAvalaible) {
+            no strict;
+            # no strict to avoid with Perl 5.8
+            # "threads::joinable" not allowed while "strict subs"
+            my @threads = threads->list(threads::joinable);
+            $_->join() foreach @threads;
+        }
+
+        # Limit the max number of running thread
+        # On Windows, it's about 15MB per thread! We need to keep the
+        # number of threads low.
+        if (!$joinableAvalaible || threads->list() > 3) {
+            foreach my $thread (threads->list()) {
+                next if $thread->tid == 1; # This is me!
+                $thread->join;
+            };
         }
         my ($c, $socket) = $daemon->accept;
         next unless $socket;
@@ -230,8 +251,7 @@ sub server {
 # HTTP::Daemon::get_request is not thread
 # safe and must be called from the master thread
         my $r = $c->get_request;
-        my $thr = threads->create(\&handler, $self, $c, $r, $clientIp);
-        push @stack, $thr;
+        threads->create(\&handler, $self, $c, $r, $clientIp);
     }
 }
 
