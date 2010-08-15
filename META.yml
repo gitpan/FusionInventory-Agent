@@ -18,21 +18,14 @@ no_index:
     - share
     - t
 recommends:
-  Archive::Extract: 0
   Compress::Zlib: 0
-  File::Glob: 0
-  File::Path: 0
   File::ShareDir: 0
   HTTP::Daemon: 0
-  MIME::Base64: 0
   Net::CUPS: 0.6
   Proc::Daemon: 0
   Proc::PID::File: 0
 requires:
   Digest::MD5: 0
-  File::Find: 0
-  File::Temp: 0
-  HTTP::Status: 0
   LWP: 0
   Net::IP: 0
   UNIVERSAL::require: 0
@@ -40,4 +33,4 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.1_rc3
+version: 2.1

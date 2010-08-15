@@ -116,7 +116,6 @@ lib/FusionInventory/Agent/Task/Inventory/OS/HPUX/Drives.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/HPUX/Memory.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/HPUX/MP.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/HPUX/Networks.pm
-lib/FusionInventory/Agent/Task/Inventory/OS/HPUX/README
 lib/FusionInventory/Agent/Task/Inventory/OS/HPUX/Slots.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/HPUX/Software.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/HPUX/Storages.pm
@@ -183,7 +182,6 @@ lib/FusionInventory/Agent/Task/Inventory/OS/Solaris/Networks.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Solaris/Packages.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Solaris/Slots.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Solaris/Storages.pm
-lib/FusionInventory/Agent/Task/Inventory/OS/Solaris/Users.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/AntiVirus.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Bios.pm
@@ -191,8 +189,10 @@ lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Chassis.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Controller.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/CPU.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Drives.pm
+lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Env.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Inputs.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Memory.pm
+lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Modem.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Networks.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/OS.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Win32/Ports.pm
@@ -238,6 +238,8 @@ Makefile.PL
 MANIFEST			This list of files
 memconf
 META.yml
+README
+README.html
 resources/cpuinfo/cpuinfo-vmware-esx
 resources/cpuinfo/linux-686-1
 resources/cpuinfo/linux-686-samsung-nc10-1
@@ -259,6 +261,7 @@ resources/dmidecode.rhel.4.3
 resources/dmidecode.rhel.4.6
 resources/hal/dell-xt2
 resources/osx/system_profiler_datatypes
+resources/osx/system_profiler_full_10.4-powerpc.txt
 resources/osx/system_profiler_full_10.5-powerpc.txt
 resources/osx/system_profiler_full_10.6-intel.txt
 resources/udev/ssd

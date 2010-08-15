@@ -21,7 +21,6 @@ package FusionInventory::Agent::Task::Inventory::OS::Generic::Screen;
 use strict;
 use warnings;
 
-use Carp;
 use English qw(-no_match_vars);
 
 sub isInventoryEnabled {
@@ -34,6 +33,8 @@ sub isInventoryEnabled {
 }
 
 sub getScreens {
+    my ($logger) = @_;
+
     my @raw_edid;
 
 
@@ -53,15 +54,14 @@ sub getScreens {
             return;
         }
 
-        use constant wbemFlagReturnImmediately => 0x10;
-        use constant wbemFlagForwardOnly => 0x20;
+#        use constant wbemFlagReturnImmediately => 0x10;
+#        use constant wbemFlagForwardOnly => 0x20;
 
-        my $objWMIService = Win32::OLE->GetObject("winmgmts:\\\\.\\root\\CIMV2") or die "WMI connection failed.\n";
-        my $colItems = $objWMIService->ExecQuery("SELECT * FROM Win32_DesktopMonitor", "WQL",
-                wbemFlagReturnImmediately | wbemFlagForwardOnly);
-
-        foreach my $objItem (getWmiProperties('Win32_DesktopMonitor', qw/
-            Caption PNPDeviceID
+#        my $objWMIService = Win32::OLE->GetObject("winmgmts:\\\\.\\root\\CIMV2") or $logger->fault("WMI connection failed.\n");
+#        my $colItems = $objWMIService->ExecQuery("SELECT * FROM Win32_DesktopMonitor", "WQL",
+#                wbemFlagReturnImmediately | wbemFlagForwardOnly);
+        foreach my $objItem (FusionInventory::Agent::Task::Inventory::OS::Win32::getWmiProperties('Win32_DesktopMonitor', qw/
+            Caption MonitorManufacturer MonitorType PNPDeviceID
         /)) {
 
             next unless $objItem->{"PNPDeviceID"};
@@ -69,19 +69,18 @@ sub getScreens {
 
             my $machKey;
             {
-                no strict;
-                # Avoid this error on non-Windows OS
-                # Bareword "Win32::TieRegistry::KEY_READ" not allowed while "strict subs"
-                my $machKey = $Registry->Open('LMachine', {
-                        Access=> Win32::TieRegistry::KEY_READ
-                    } ) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
+                # Win32-specifics constants can not be loaded on non-Windows OS
+                no strict 'subs';
+                $machKey = $Registry->Open('LMachine', {
+                    Access => Win32::TieRegistry::KEY_READ
+                } ) or $logger->fault("Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR");
             }
 
             my $edid =
                 $machKey->{"SYSTEM/CurrentControlSet/Enum/$objItem->{PNPDeviceID}/Device Parameters/EDID"} || '';
             $edid =~ s/^\s+$//;
 
-            push @raw_edid, { name => $name, edid => $edid };
+            push @raw_edid, { name => $name, edid => $edid, type => $objItem->{MonitorType}, manufacturer => $objItem->{MonitorManufacturer}, caption => $objItem->{Caption} };
         }
 
     } else {
@@ -646,13 +645,12 @@ sub doInventory {
     my $verbose;
     my $MonitorsDB;
 
-    my @screens = getScreens();
+    my @screens = getScreens($logger);
 
     return unless @screens;
 
     foreach my $screen (@screens) {
         my $name = $screen->{name};
-
         my $caption = $name;
         my $description;
         my $manufacturer;
@@ -686,9 +684,9 @@ sub doInventory {
 
         $inventory->addMonitor ({
             BASE64 => $base64,
-            CAPTION => $caption,
-            DESCRIPTION => $description,
-            MANUFACTURER => $manufacturer,
+            CAPTION => $caption || $screen->{caption},
+            DESCRIPTION => $description || $screen->{description},
+            MANUFACTURER => $manufacturer || $screen->{manufacturer},
             SERIAL => $serial,
             UUENCODE => $uuencode,
         });

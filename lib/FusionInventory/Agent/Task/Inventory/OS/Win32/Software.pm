@@ -6,7 +6,6 @@ use warnings;
 use constant KEY_WOW64_64KEY => 0x100; 
 use constant KEY_WOW64_32KEY => 0x200; 
 
-use Carp;
 use Config;
 use English qw(-no_match_vars);
 use Win32;
@@ -70,7 +69,7 @@ sub processSoftwares {
 
         my $name = encodeFromRegistry($data->{'/DisplayName'});
 # Use the folder name if there is no DisplayName
-        $name = encodeFromRegistry($_) unless $name;
+        $name = encodeFromRegistry($guid) unless $name;
         my $comments = encodeFromRegistry($data->{'/Comments'});
         my $version = encodeFromRegistry($data->{'/DisplayVersion'});
         my $publisher = encodeFromRegistry($data->{'/Publisher'});
@@ -113,6 +112,7 @@ sub doInventory {
     my $params = shift;
 
     my $inventory = $params->{inventory};
+    my $logger    = $params->{logger};
 
     my $KEY_WOW64_64KEY = 0x100; 
     my $KEY_WOW64_32KEY = 0x200; 
@@ -137,7 +137,7 @@ sub doInventory {
 
         my $machKey64bit = $Registry->Open('LMachine', {
             Access => KEY_READ | KEY_WOW64_64KEY
-        }) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
+        }) or $logger->fault("Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR");
 
         my $softwares=
             $machKey64bit->{"SOFTWARE/Microsoft/Windows/CurrentVersion/Uninstall"};
@@ -145,7 +145,7 @@ sub doInventory {
 
         my $machKey32bit = $Registry->Open('LMachine', {
             Access => KEY_READ | KEY_WOW64_32KEY
-        }) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
+        }) or $logger->fault("Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR");
 
         $softwares=
             $machKey32bit->{"SOFTWARE/Microsoft/Windows/CurrentVersion/Uninstall"};
@@ -155,7 +155,7 @@ sub doInventory {
     } else {
         my $machKey = $Registry->Open('LMachine', {
             Access => KEY_READ()
-        }) or croak "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
+        }) or $logger->fault("Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR");
 
         my $softwares=
             $machKey->{"SOFTWARE/Microsoft/Windows/CurrentVersion/Uninstall"};
