@@ -226,8 +226,8 @@ sub doInventory {
             $device->{MANUFACTURER} = getManufacturer($device->{MODEL});
         }
 
-        if ($device->{CAPACITY} && $device->{CAPACITY} =~ /^cd/) {
-            $device->{CAPACITY} = getCapacity($device->{NAME});
+        if (!$device->{DISKSIZE} && $device->{TYPE} !~ /^cd/) {
+            $device->{DISKSIZE} = getCapacity($device->{NAME});
         }
 
         $inventory->addStorage($device);
@@ -273,9 +273,6 @@ sub parseUdev {
         $result->{SERIALNUMBER} = $serial
     }
 
-    $result->{DISKSIZE} = getCapacity($device)
-    if $result->{TYPE} ne 'cd';
-
     $result->{NAME} = $device;
 
     return $result;
@@ -291,7 +288,8 @@ sub parseLshal {
         return;
     }
 
-    my ($devices, $device);
+    my $devices = [];
+    my $device = {};
 
     while (my $line = <$handle>) {
         chomp $line;
@@ -303,8 +301,11 @@ sub parseLshal {
         next unless defined $device;
 
         if ($line =~ /^$/) {
-            push(@$devices, $device);
-            undef $device;
+            if (keys %$device && defined($device->{ISVOLUME}) && !$device->{ISVOLUME}) {
+                delete($device->{ISVOLUME});
+                push(@$devices, $device);
+                undef $device;
+            }
         } elsif ($line =~ /^\s+ storage.serial \s = \s '([^']+)'/x) {
             $device->{SERIALNUMBER} = $1;
         } elsif ($line =~ /^\s+ storage.firmware_version \s = \s '([^']+)'/x) {
@@ -321,7 +322,9 @@ sub parseLshal {
         } elsif ($line =~ /^\s+ storage.size \s = \s (\S+)/x) {
             my $value = $1;
             $device->{DISKSIZE} = int($value/(1024*1024) + 0.5);
-        }
+        } elsif ($line =~ /block.is_volume\s*=\s*false/i) {
+           $device->{ISVOLUME} = 0;
+       }
     }
     close $handle;
 

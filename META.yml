@@ -19,6 +19,7 @@ no_index:
     - t
 recommends:
   Compress::Zlib: 0
+  Crypt::SSLeay: 0
   File::ShareDir: 0
   HTTP::Daemon: 0
   Net::CUPS: 0.6
@@ -33,4 +34,4 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.1
+version: 2.1.1

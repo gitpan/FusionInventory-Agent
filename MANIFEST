@@ -238,8 +238,6 @@ Makefile.PL
 MANIFEST			This list of files
 memconf
 META.yml
-README
-README.html
 resources/cpuinfo/cpuinfo-vmware-esx
 resources/cpuinfo/linux-686-1
 resources/cpuinfo/linux-686-samsung-nc10-1
@@ -260,6 +258,7 @@ resources/dmidecode.rhel.3.4
 resources/dmidecode.rhel.4.3
 resources/dmidecode.rhel.4.6
 resources/hal/dell-xt2
+resources/hal/rh4-kvm
 resources/osx/system_profiler_datatypes
 resources/osx/system_profiler_full_10.4-powerpc.txt
 resources/osx/system_profiler_full_10.5-powerpc.txt
