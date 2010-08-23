@@ -238,6 +238,8 @@ Makefile.PL
 MANIFEST			This list of files
 memconf
 META.yml
+README
+README.html
 resources/cpuinfo/cpuinfo-vmware-esx
 resources/cpuinfo/linux-686-1
 resources/cpuinfo/linux-686-samsung-nc10-1
@@ -275,6 +277,7 @@ t/dmidecode.t
 t/drives.t
 t/inventory-xml.t
 t/modules.t
+t/README.t
 t/storages.t
 t/xml-query-inventory.t
 t/xml-query-simplemessage.t
