@@ -261,10 +261,17 @@ resources/dmidecode.rhel.4.3
 resources/dmidecode.rhel.4.6
 resources/hal/dell-xt2
 resources/hal/rh4-kvm
+resources/opensolaris/release-1
 resources/osx/system_profiler_datatypes
 resources/osx/system_profiler_full_10.4-powerpc.txt
 resources/osx/system_profiler_full_10.5-powerpc.txt
 resources/osx/system_profiler_full_10.6-intel.txt
+resources/solaris/release-1
+resources/solaris/release-2
+resources/solaris/release-3
+resources/solaris/release-4
+resources/solaris/release-5
+resources/solaris/release-6
 resources/udev/ssd
 share/html/favicon.ico
 share/html/index.tpl

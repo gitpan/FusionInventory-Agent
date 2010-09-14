@@ -25,7 +25,7 @@ EXAMPLES
         % fusioninventory-agent --server localhost --user=toto --password=pw --realm="Restricted Area"
         # send a report to a server protected by a basic authentication
         % fusioninventory-agent --lazy
-        # send an inventory only if the a random delay between 0 and PROLOG_FREQ had been run over.
+        # send an inventory only if a random delay between 0 and PROLOG_FREQ had been run over.
 
         % fusioninventory-agent --delaytime 60 -d
         # If NO PROLOG_FREQ has been preset, pick a time between execution and --delaytime for the agent to contact the server [default is 3600 seconds]
@@ -109,19 +109,19 @@ INSTALLATION
   POST-INSTALLATION
     Run ./fusioninventory-agent-config for automatic configuration.
 
-OCS INVENTORY PROTOCOLE
-    FusionInventory Agent uses OCS Inventory protocle and is compatible with
-    OCS Inventory server. The agent uses the same protocle with the
+OCS INVENTORY PROTOCOL
+    FusionInventory Agent uses OCS Inventory protocol and is compatible with
+    OCS Inventory server. The agent uses the same protocol with the
     FusionInventory For GLPI plugin.
 
-    The OCS protocole is basicly an exchange of XML file done over HTTP(S).
+    The OCS protocol is basicly an exchange of XML file done over HTTP(S).
 
   First, The PROLOG
     The agent send a first message to give it's ID (DEVICEID). The server
-    send by a the agent a XML file with a list of parameter. It's the PROLOG
-    RESP. You can see it if you're in Debug mode. In this PROLOG, the server
-    send the PROLOG_FREQ. The agent will use it to know when it need to
-    contact the server for the next time.
+    send back to the agent an XML file with a list of parameter. It's the
+    PROLOG RESP. You can see it if you're in Debug mode. In this PROLOG, the
+    server send the PROLOG_FREQ. The agent will use it to know when it need
+    to contact the server for the next time.
 
   Module execution
     The agent will launch each modules and pass the list of options found in
@@ -158,11 +158,11 @@ OPTIONS
         Launch fusioninventory-agent in daemon but do fork in background.
 
     --ca-cert-dir=PATH
-        The directory where public SSL certificat are stored. In general it
-        /etc/ssl/certs;
+        The directory where public SSL certificates are stored. In general
+        it's /etc/ssl/certs.
 
     --ca-cert-file=FILE
-        The path to the public certificat (e.g: /etc/ssl/certs/cacert.pem).
+        The path to the public certificate (e.g: /etc/ssl/certs/cacert.pem).
         If --ca-cert-file is used, --ca-cert-dir is ignored.
 
     --conf-file=FILE
@@ -260,16 +260,16 @@ OPTIONS
         Do not inventory the software installed on the machine.
 
     -p, --password=*PASSWORD*
-        Use *PASSWORD* for an HTTP identification with the server.
+        Use *PASSWORD* for an HTTP authentification with the server.
 
     -P, --proxy=*PROXY*
         Use *PROXY* to specify a proxy HTTP server. By default, the agent
         uses HTTP_PROXY environment variable.
 
     -r, --realm=*REALM*
-        Use *REALM* for an HTTP identification with the server. For example,
-        the value can be 'Restricted Area'. You can find it in the login
-        popup of your Internet browser.
+        Use *REALM* for an HTTP authentification with the server. For
+        example, the value can be 'Restricted Area'. You can find it in the
+        login popup of your Internet browser.
 
         if no realm is passed and the auth fails, the agent will retry an
         authentification with the realm returned by the server.
@@ -285,12 +285,12 @@ OPTIONS
 
     --scan-homedirs
         Should the agent scan the user directories to inventory their
-        virtual machine?
+        virtual machines ?.
 
     -s, --server=*URI*
         The uri of the server. If *URI* doesn't start with http:// or
-        https://, the assume the parameter is a hostname and rewrite it like
-        that:
+        https://, the agent assume the parameter is a hostname and rewrite
+        it like that:
 
             % --server=http://servername/ocsinventory
 
@@ -312,7 +312,7 @@ OPTIONS
         --server is ignored if --local is in use.
 
     --share-dir
-        The directory where a stored the shared files. You probably don't
+        The directory where are stored the shared files. You probably don't
         need this option unless you don't want to use the Makefile.PL
         installation procedure or if File::ShareDir is not avalaible.
 
@@ -324,8 +324,8 @@ OPTIONS
             # A file will be created.
 
     --scan-homedirs
-        Authorized the agent to scan home directories to increase the
-        Virtual Machine inventory.
+        Authorize the agent to scan home directories to help with the
+        Virtual Machines inventory.
 
     --tag=*TAG*
         Mark the machine with the *TAG* tag. Once the initial inventory is
@@ -365,6 +365,8 @@ CONFIG FILE
     file from a specific location. On Windows the settings are loaded from
     the Registry. The configuration file is ignored.
 
+    The command line parameters overwrite the configuration file.
+
 SECURITY
     Some modules like SNMPQuery needs to sent credential from the agent to
     the agent. We recommend to enable HTTPS support on the OCS or
@@ -384,7 +386,7 @@ SEE ALSO
 
     *   project Forge: <http://Forge.FusionInventory.org>
 
-    *   The source code of the agent is avalaible on:
+    *   The source code of the agent is available on:
 
         *   Gitorious: <http://gitorious.org/fusioninventory>
 
@@ -403,7 +405,7 @@ SEE ALSO
 BUGS
     Please, use the mailing lists as much as possible. You can open your own
     bug tickets. Patches are welcome. You can also use the bugtracker on
-    http://Forge.FusionInventory.org
+    http://forge.fusionInventory.org
 
 COPYRIGHT
     Copyright (C) 2006-2010 OCS Inventory contributors Copyright (C) 2010

@@ -35,7 +35,7 @@
 		<li><a href="#post_installation">POST-INSTALLATION</a></li>
 	</ul>
 
-	<li><a href="#ocs_inventory_protocole">OCS INVENTORY PROTOCOLE</a></li>
+	<li><a href="#ocs_inventory_protocol">OCS INVENTORY PROTOCOL</a></li>
 	<ul>
 
 		<li><a href="#first__the_prolog">First, The PROLOG</a></li>
@@ -89,7 +89,7 @@
     % fusioninventory-agent --server localhost --user=toto --password=pw --realm=&quot;Restricted Area&quot;
     # send a report to a server protected by a basic authentication
     % fusioninventory-agent --lazy
-    # send an inventory only if the a random delay between 0 and PROLOG_FREQ had been run over.</pre>
+    # send an inventory only if a random delay between 0 and PROLOG_FREQ had been run over.</pre>
 <pre>
     % fusioninventory-agent --delaytime 60 -d
     # If NO PROLOG_FREQ has been preset, pick a time between execution and --delaytime for the agent to contact the server [default is 3600 seconds]</pre>
@@ -208,16 +208,16 @@ installation process avalaible there:
 <p>
 </p>
 <hr />
-<h1><a name="ocs_inventory_protocole">OCS INVENTORY PROTOCOLE</a></h1>
-<p>FusionInventory Agent uses OCS Inventory protocle and is compatible with OCS
-Inventory server. The agent uses the same protocle with the FusionInventory
+<h1><a name="ocs_inventory_protocol">OCS INVENTORY PROTOCOL</a></h1>
+<p>FusionInventory Agent uses OCS Inventory protocol and is compatible with OCS
+Inventory server. The agent uses the same protocol with the FusionInventory
 For GLPI plugin.</p>
-<p>The OCS protocole is basicly an exchange of XML file done over HTTP(S).</p>
+<p>The OCS protocol is basicly an exchange of XML file done over HTTP(S).</p>
 <p>
 </p>
 <h2><a name="first__the_prolog">First, The PROLOG</a></h2>
 <p>The agent send a first message to give it's ID (DEVICEID). The
-server send by a the agent a XML file with a list of parameter. It's the
+server send back to the agent an XML file with a list of parameter. It's the
 PROLOG RESP. You can see it if you're in Debug mode.
 In this PROLOG, the server send the PROLOG_FREQ. The agent will use it to
 know when it need to contact the server for the next time.</p>
@@ -272,13 +272,13 @@ timeout.</p>
 <dt><strong><a name="ca_cert_dir_path" class="item"><strong>--ca-cert-dir=PATH</strong></a></strong></dt>
 
 <dd>
-<p>The directory where public SSL certificat are stored. In general it
-/etc/ssl/certs;</p>
+<p>The directory where public SSL certificates are stored. In general it's
+/etc/ssl/certs.</p>
 </dd>
 <dt><strong><a name="ca_cert_file_file" class="item"><strong>--ca-cert-file=FILE</strong></a></strong></dt>
 
 <dd>
-<p>The path to the public certificat (e.g: /etc/ssl/certs/cacert.pem). If
+<p>The path to the public certificate (e.g: /etc/ssl/certs/cacert.pem). If
 --ca-cert-file is used, --ca-cert-dir is ignored.</p>
 </dd>
 <dt><strong><a name="conf_file_file" class="item"><strong>--conf-file=FILE</strong></a></strong></dt>
@@ -414,7 +414,7 @@ location of your log file. <strong>--logfile</strong> turns this option on autom
 <dt><strong><a name="p_password_password" class="item"><strong>-p</strong>, <strong>--password</strong>=<em>PASSWORD</em></a></strong></dt>
 
 <dd>
-<p>Use <em>PASSWORD</em> for an HTTP identification with the server.</p>
+<p>Use <em>PASSWORD</em> for an HTTP authentification with the server.</p>
 </dd>
 <dt><strong><a name="p_proxy_proxy" class="item"><strong>-P</strong>, <strong>--proxy</strong>=<em>PROXY</em></a></strong></dt>
 
@@ -425,7 +425,7 @@ HTTP_PROXY environment variable.</p>
 <dt><strong><a name="r_realm_realm" class="item"><strong>-r</strong>, <strong>--realm</strong>=<em>REALM</em></a></strong></dt>
 
 <dd>
-<p>Use <em>REALM</em> for an HTTP identification with the server. For example, the
+<p>Use <em>REALM</em> for an HTTP authentification with the server. For example, the
 value can be 'Restricted Area'. You can find it in the login popup of your
 Internet browser.</p>
 <p>if no realm is passed and the auth fails, the agent will retry an authentification
@@ -446,13 +446,13 @@ inventory immediately.</p>
 <dt><strong><a name="scan_homedirs" class="item"><strong>--scan-homedirs</strong></a></strong></dt>
 
 <dd>
-<p>Should the agent scan the user directories to inventory their virtual machine?</p>
+<p>Should the agent scan the user directories to inventory their virtual machines ?.</p>
 </dd>
 <dt><strong><a name="s_server_uri" class="item"><strong>-s</strong>, <strong>--server</strong>=<em>URI</em></a></strong></dt>
 
 <dd>
 <p>The uri of the server. If <em>URI</em> doesn't start with http:// or https://, the
-assume the parameter is a hostname and rewrite it like that:</p>
+agent assume the parameter is a hostname and rewrite it like that:</p>
 <pre>
     % --server=<a href="http://servername/ocsinventory">http://servername/ocsinventory</a></pre>
 <p>If you want to use https or another virtual directory (e.g: /ocsinventory2)
@@ -471,7 +471,7 @@ you need to enter the full path.</p>
 <dt><strong><a name="share_dir" class="item"><strong>--share-dir</strong></a></strong></dt>
 
 <dd>
-<p>The directory where a stored the shared files. You probably don't
+<p>The directory where are stored the shared files. You probably don't
 need this option unless you don't want to use the Makefile.PL installation
 procedure or if File::ShareDir is not avalaible.</p>
 </dd>
@@ -487,7 +487,7 @@ procedure or if File::ShareDir is not avalaible.</p>
 <dt><strong><a name="scan_homedirs2" class="item"><strong>--scan-homedirs</strong></a></strong></dt>
 
 <dd>
-<p>Authorized the agent to scan home directories to increase the Virtual Machine
+<p>Authorize the agent to scan home directories to help with the Virtual Machines
 inventory.</p>
 </dd>
 <dt><strong><a name="tag_tag" class="item"><strong>--tag</strong>=<em>TAG</em></a></strong></dt>
@@ -545,6 +545,7 @@ config file.</p>
 file from a specific location.
 On Windows the settings are loaded from the Registry. The configuration file
 is ignored.</p>
+<p>The command line parameters overwrite the configuration file.</p>
 <p>
 </p>
 <hr />
@@ -575,7 +576,7 @@ FusionInventory.</p>
 </dd>
 <dt>
 <dd>
-<p>The source code of the agent is avalaible on:</p>
+<p>The source code of the agent is available on:</p>
 <dl>
 <dt>
 <dd>
@@ -612,7 +613,7 @@ FusionInventory.</p>
 <h1><a name="bugs">BUGS</a></h1>
 <p>Please, use the mailing lists as much as possible. You can open your own bug
 tickets. Patches are welcome. You can also use the bugtracker on
-<a href="http://Forge.FusionInventory.org">http://Forge.FusionInventory.org</a></p>
+<a href="http://forge.fusionInventory.org">http://forge.fusionInventory.org</a></p>
 <p>
 </p>
 <hr />
