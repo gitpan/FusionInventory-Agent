@@ -275,6 +275,13 @@ The path to the public certificate (e.g: /etc/ssl/certs/cacert.pem). If
 
 Load the configuration file from the given location. Ignored on Windows.
 
+On Windows the settings are loaded from the registry. The information are
+stored there:
+HKEY_LOCAL_MACHINE\SOFTWARE\FusionInventory-Agent
+
+Or on Windows 64bit machine:
+HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\FusionInventory-Agent
+
 =item B<--debug>
 
 Turn the debug mode on.
@@ -410,6 +417,12 @@ with the realm returned by the server.
 
 The IP address of the interface to use for the P2P exchange. The default
 is 'all' the IP addresses with a 255.255.255.0 mask except 127.0.0.1.
+
+=item B<--rpc-port>=P<PORT>
+
+The PORT of the interface to use for the embedded HTTP server used for the
+peer to peer data exchange and remote control. The default
+is '62354'.
 
 =item B<--rpc-trust-localhost>
 

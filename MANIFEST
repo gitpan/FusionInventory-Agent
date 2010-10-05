@@ -250,6 +250,8 @@ resources/cpuinfo/linux-mips-1
 resources/cpuinfo/linux-ppc-1
 resources/cpuinfo/linux-ppc-2
 resources/cpuinfo/linux-sparc-1
+resources/ddcprobe/98LMTF053166
+resources/ddcprobe/HT009154WU2
 resources/dmidecode-2.10-windows
 resources/dmidecode-freebsd-6.2
 resources/dmidecode-linux-2.6

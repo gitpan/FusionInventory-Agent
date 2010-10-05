@@ -285,6 +285,11 @@ timeout.</p>
 
 <dd>
 <p>Load the configuration file from the given location. Ignored on Windows.</p>
+<p>On Windows the settings are loaded from the registry. The information are
+stored there:
+HKEY_LOCAL_MACHINE\SOFTWARE\FusionInventory-Agent</p>
+<p>Or on Windows 64bit machine:
+HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\FusionInventory-Agent</p>
 </dd>
 <dt><strong><a name="debug" class="item"><strong>--debug</strong></a></strong></dt>
 
@@ -436,6 +441,13 @@ with the realm returned by the server.</p>
 <dd>
 <p>The IP address of the interface to use for the P2P exchange. The default
 is 'all' the IP addresses with a 255.255.255.0 mask except 127.0.0.1.</p>
+</dd>
+<dt><strong><a name="rpc_port_p_port" class="item"><strong>--rpc-port</strong>=P&lt;PORT&gt;</a></strong></dt>
+
+<dd>
+<p>The PORT of the interface to use for the embedded HTTP server used for the
+peer to peer data exchange and remote control. The default
+is '62354'.</p>
 </dd>
 <dt><strong><a name="rpc_trust_localhost" class="item"><strong>--rpc-trust-localhost</strong></a></strong></dt>
 

@@ -169,6 +169,13 @@ OPTIONS
         Load the configuration file from the given location. Ignored on
         Windows.
 
+        On Windows the settings are loaded from the registry. The
+        information are stored there:
+        HKEY_LOCAL_MACHINE\SOFTWARE\FusionInventory-Agent
+
+        Or on Windows 64bit machine:
+        HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\FusionInventory-Agent
+
     --debug
         Turn the debug mode on.
 
@@ -278,6 +285,11 @@ OPTIONS
         The IP address of the interface to use for the P2P exchange. The
         default is 'all' the IP addresses with a 255.255.255.0 mask except
         127.0.0.1.
+
+    --rpc-port=PORT
+        The PORT of the interface to use for the embedded HTTP server used
+        for the peer to peer data exchange and remote control. The default
+        is '62354'.
 
     --rpc-trust-localhost
         Allow local users to access to http://127.0.0.1:62354/now to force
@@ -458,4 +470,11 @@ COPYRIGHT
          along with this package; if not, write to the Free Software
          Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
          USA
+
+POD ERRORS
+    Hey! The above document had some coding errors, which are explained
+    below:
+
+    Around line 421:
+        Deleting unknown formatting code P<>
 
