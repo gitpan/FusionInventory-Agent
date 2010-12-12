@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-use Cwd qw(fast_abs_path abs_path);
+use File::Spec;
 use English qw(-no_match_vars);
 
 my $basedir = '';
@@ -14,7 +14,7 @@ if ($OSNAME eq 'MSWin32') {
     $basedir = $ENV{APPDATA}.'/fusioninventory-agent';
     $basevardir = $basedir.'/var/lib/fusioninventory-agent';
 } else {
-    $basevardir = abs_path($basedir.'/var/lib/fusioninventory-agent'),
+    $basevardir = File::Spec->rel2abs($basedir.'/var/lib/fusioninventory-agent'),
 }
 
 my $default = {
@@ -60,12 +60,14 @@ my $default = {
     'no-wakeonlan'            => 0,
     'no-snmpquery'            => 0,
     'no-netdiscovery'         => 0,
+    'no-p2p'                  => 0,
     'delaytime'               => 3600, # max delay time (seconds)
     'backend-collect-timeout' => 180,   # timeOut of process : see Backend.pm
     'no-ssl-check'            => 0,
     'scan-homedirs'           => 0,
     'rpc-ip'                  => '',
     'rpc-port'                => '62354',
+    'rpc-trust-localhost'     => 0,
     # Other values that can't be changed with the
     # CLI parameters
     'basevardir'              => $basevardir,
@@ -88,7 +90,7 @@ sub load {
 
     if (!$config->{'share-dir'}) {
         if ($config->{'devlib'}) {
-                $config->{'share-dir'} = abs_path('./share/');
+                $config->{'share-dir'} = File::Spec->rel2abs('./share/');
         } else {
             eval { 
                 require File::ShareDir;
@@ -231,6 +233,7 @@ sub loadUserParams {
         'no-wakeonlan',
         'no-snmpquery',
         'no-netdiscovery',
+        'no-p2p',
         'password|p=s',
         'proxy|P=s',
         'realm|r=s',
@@ -249,15 +252,12 @@ sub loadUserParams {
     ) or help($config);
 
     # We want only canonical path
-    $config->{basevardir} = abs_path($config->{basevardir}) if $config->{basevardir};
-    $config->{'share-dir'} = abs_path($config->{'share-dir'}) if $config->{'share-dir'};
-    $config->{'conf-file'} = abs_path($config->{'conf-file'}) if $config->{'conf-file'};
-    $config->{'ca-cert-file'} = abs_path($config->{'ca-cert-file'}) if $config->{'ca-cert-file'};
-    $config->{'ca-cert-dir'} = abs_path($config->{'ca-cert-dir'}) if $config->{'ca-cert-dir'};
-# On Windows abs_path fails if the file doesn't exist yet. Win32::GetFullPathName is ok.
-    if ($config->{'logfile'}) {
-        $config->{'logfile'} = ($^O eq 'MSWin32')?Win32::GetFullPathName($config->{'logfile'}):abs_path($config->{'logfile'});
-    }
+    $config->{basevardir} = File::Spec->rel2abs($config->{basevardir}) if $config->{basevardir};
+    $config->{'share-dir'} = File::Spec->rel2abs($config->{'share-dir'}) if $config->{'share-dir'};
+    $config->{'conf-file'} = File::Spec->rel2abs($config->{'conf-file'}) if $config->{'conf-file'};
+    $config->{'ca-cert-file'} = File::Spec->rel2abs($config->{'ca-cert-file'}) if $config->{'ca-cert-file'};
+    $config->{'ca-cert-dir'} = File::Spec->rel2abs($config->{'ca-cert-dir'}) if $config->{'ca-cert-dir'};
+    $config->{'logfile'} = File::Spec->rel2abs($config->{'logfile'}) if $config->{'logfile'};
 
 
     help($config) if $config->{help};
@@ -307,6 +307,7 @@ Disable options:
     --no-wakeonlan      do not use wakeonlan function ($config->{'no-wakeonlan'})
     --no-snmpquery      do not use snmpquery function ($config->{'no-snmpquery'})
     --no-netdiscovery   do not use netdiscovery function ($config->{'no-netdiscovery'})
+    --no-p2p            do not use P2P feature for OCS software deployment ($config->{'no-p2p'})
 
 Extra options:
     --backend-collect-timeout   set a maximum delay time of one inventory data collect job ($config->{'backend-collect-timeout'})

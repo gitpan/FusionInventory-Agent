@@ -39,7 +39,7 @@ sub getFromSysProc {
         push(@names, $1);
     }
 
-    my $command = `fdisk -v` =~ '^GNU' ? 'fdisk -p -l' : 'fdisk -l';
+    my $command = `fdisk -v` =~ '^GNU' ? 'fdisk -p -l 2>&1' : 'fdisk -l 2>&1';
     if (!open my $handle, '-|', $command) {
         warn "Can't run $command: $ERRNO";
     } else {
@@ -101,8 +101,10 @@ sub getCapacity {
     my ($dev) = @_;
     my $command = `/sbin/fdisk -v` =~ '^GNU' ? 'fdisk -p -s' : 'fdisk -s';
     # requires permissions on /dev/$dev
-    my $cap = `$command /dev/$dev 2>/dev/null`;
-    chomp $cap;
+    my $cap;
+    foreach (`$command /dev/$dev 2>/dev/null`) {
+        $cap = $1 if /^\d+$/;
+    }
     $cap = int($cap / 1000) if $cap;
     return $cap;
 }
@@ -115,7 +117,13 @@ sub getDescription {
     return "USB" if (defined ($description) && $description =~ /usb/i);
 
     if ($name =~ /^s/) { # /dev/sd* are SCSI _OR_ SATA
-        if (($manufacturer && ($manufacturer =~ /ATA/)) || ($serialnumber && ($serialnumber =~ /ATA/))) {
+        if (
+	($manufacturer && ($manufacturer =~ /ATA/))
+	||
+	($serialnumber && ($serialnumber =~ /ATA/))
+	||
+	($description && ($description =~ /ATA/))
+	) {
             return  "SATA";
         } else {
             return "SCSI";
@@ -201,13 +209,19 @@ sub doInventory {
                         if !$device->{SERIALNUMBER};
                         next;
                     }
-                    if ($line =~ /^\s+Firmware Revision\s*:\s*(.+)/i) {
+                    elsif ($line =~ /^\s+Firmware Revision\s*:\s*(.+)/i) {
                         my $value = $1;
                         $value =~ s/\s+$//;
                         $device->{FIRMWARE} = $value
                         if !$device->{FIRMWARE};
                         next;
                     }
+		    elsif ($line =~ /^\s*Transport:.*(SCSI|SATA|USB)/) {
+			$device->{DESCRIPTION} = $1;
+		    }
+		    elsif ($line =~ /^\s*Model Number:\s*(.*?)\s*$/) {
+			$device->{MODEL} = $1;
+		    }
                 }
                 close $handle;
             }
@@ -215,12 +229,14 @@ sub doInventory {
     }
 
     foreach my $device (@devices) {
+	if (!$device->{DESCRIPTION}) {
         $device->{DESCRIPTION} = getDescription(
             $device->{NAME},
             $device->{MANUFACTURER},
             $device->{DESCRIPTION},
             $device->{SERIALNUMBER}
-        );
+            );
+	}
 
         if (!$device->{MANUFACTURER} or $device->{MANUFACTURER} eq 'ATA') {
             $device->{MANUFACTURER} = getManufacturer($device->{MODEL});

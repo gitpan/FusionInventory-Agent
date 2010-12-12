@@ -221,6 +221,9 @@ server send back to the agent an XML file with a list of parameter. It's the
 PROLOG RESP. You can see it if you're in Debug mode.
 In this PROLOG, the server send the PROLOG_FREQ. The agent will use it to
 know when it need to contact the server for the next time.</p>
+<p>The agent compute the next query date this way:</p>
+<pre>
+     PROLOG_FREQ/2+RANDOM(PROLOG_FREQ/2)</pre>
 <p>
 </p>
 <h2><a name="module_execution">Module execution</a></h2>
@@ -269,19 +272,23 @@ timeout.</p>
 <dd>
 <p>Launch fusioninventory-agent in daemon but do fork in background.</p>
 </dd>
-<dt><strong><a name="ca_cert_dir_path" class="item"><strong>--ca-cert-dir=PATH</strong></a></strong></dt>
+<dt><strong><a name="ca_cert_dir_path" class="item"><strong>--ca-cert-dir</strong>=<em>PATH</em></a></strong></dt>
 
 <dd>
 <p>The directory where public SSL certificates are stored. In general it's
 /etc/ssl/certs.</p>
+<p>You don't need to copy a public certificate on very agent if your private
+key is valide and was been signed by a valide certificate authority.</p>
 </dd>
-<dt><strong><a name="ca_cert_file_file" class="item"><strong>--ca-cert-file=FILE</strong></a></strong></dt>
+<dt><strong><a name="ca_cert_file_file" class="item"><strong>--ca-cert-file</strong>=<em>FILE</em></a></strong></dt>
 
 <dd>
 <p>The path to the public certificate (e.g: /etc/ssl/certs/cacert.pem). If
 --ca-cert-file is used, --ca-cert-dir is ignored.</p>
+<p>You don't need to copy a public certificate on very agent if your private
+key is valide and was been signed by a valide certificate authority.</p>
 </dd>
-<dt><strong><a name="conf_file_file" class="item"><strong>--conf-file=FILE</strong></a></strong></dt>
+<dt><strong><a name="conf_file_file" class="item"><strong>--conf-file</strong>=<em>FILE</em></a></strong></dt>
 
 <dd>
 <p>Load the configuration file from the given location. Ignored on Windows.</p>
@@ -416,6 +423,11 @@ location of your log file. <strong>--logfile</strong> turns this option on autom
 <dd>
 <p>Do not inventory the software installed on the machine.</p>
 </dd>
+<dt><strong><a name="no_p2p" class="item"><strong>--no-p2p</strong></a></strong></dt>
+
+<dd>
+<p>For OCS Inventory software deployment. Do not use peer 2 peer to download files.</p>
+</dd>
 <dt><strong><a name="p_password_password" class="item"><strong>-p</strong>, <strong>--password</strong>=<em>PASSWORD</em></a></strong></dt>
 
 <dd>
@@ -442,7 +454,7 @@ with the realm returned by the server.</p>
 <p>The IP address of the interface to use for the P2P exchange. The default
 is 'all' the IP addresses with a 255.255.255.0 mask except 127.0.0.1.</p>
 </dd>
-<dt><strong><a name="rpc_port_p_port" class="item"><strong>--rpc-port</strong>=P&lt;PORT&gt;</a></strong></dt>
+<dt><strong><a name="rpc_port_port" class="item"><strong>--rpc-port</strong>=<em>PORT</em></a></strong></dt>
 
 <dd>
 <p>The PORT of the interface to use for the embedded HTTP server used for the

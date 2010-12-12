@@ -6,6 +6,7 @@ use warnings;
 use constant KEY_WOW64_64KEY => 0x100;
 
 use English qw(-no_match_vars);
+use Win32;
 use Win32::TieRegistry (
     Delimiter   => '/',
     ArrayValues => 0,
@@ -49,16 +50,23 @@ sub doInventory {
     my $logger = $params->{logger};
 
     my $serial;
+    my $id;
     my $speed;
 
     my $vmsystem;
 
+# http://forge.fusioninventory.org/issues/379
+    my(@osver) = Win32::GetOSVersion();
+    my $isWin2003 = ($osver[4] == 2 && $osver[1] == 5 && $osver[2] == 2);
+
+
     my @dmidecodeCpu;
-    if (can_run("dmidecode")) {
+    if (!$isWin2003 && can_run("dmidecode")) {
         my $in;
         foreach (`dmidecode`) {
             if ($in && /^Handle/)  {
-                push @dmidecodeCpu, {serial => $serial, speed => $speed};
+                push @dmidecodeCpu, {serial => $serial, speed => $speed, id => $id};
+		$serial = $speed = $id = undef;
                 $in = 0;
             }
 
@@ -67,7 +75,8 @@ sub doInventory {
             } elsif ($in) {
                 $speed = $1 if /Max Speed:\s+(\d+)\s+MHz/i;
                 $speed = $1*1000 if /Max Speed:\s+(\w+)\s+GHz/i;
-                $serial = $1 if /ID:\s+(.*)/i;
+                $id = $1 if /ID:\s+(.*)/i;
+                $serial = $1 if /Serial\s*Number:\s+(.*)/i;
 #                Core Count: 2
 #                Core Enabled: 2
 #                Thread Count: 2
@@ -89,7 +98,8 @@ sub doInventory {
         my $description = $info->{Identifier};
         my $name = $info->{ProcessorNameString};
         my $manufacturer = $info->{VendorIdentifier};
-        my $serial = $dmidecodeCpu[$cpuId]->{serial} || $Properties->{ProcessorId};
+        my $id = $dmidecodeCpu[$cpuId]->{id} || $Properties->{ProcessorId};
+        my $serial = $dmidecodeCpu[$cpuId]->{serial};
         my $speed = $dmidecodeCpu[$cpuId]->{speed} || $Properties->{MaxClockSpeed};
 
         if ($manufacturer) {
@@ -117,8 +127,6 @@ sub doInventory {
 
         }
 
-
-
         $inventory->addCPU({
 #           CACHE => $cache,
             CORE => $core,
@@ -126,7 +134,8 @@ sub doInventory {
             NAME => $name,
             MANUFACTURER => $manufacturer,
             SERIAL => $serial,
-            SPEED => $speed
+            SPEED => $speed,
+	    ID => $id
         });
 
         $cpuId++;

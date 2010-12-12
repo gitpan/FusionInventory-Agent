@@ -27,17 +27,21 @@ sub doInventory {
     my $thread;
     my $empty;
     my $core;
+    my $name;
+    my $id;
     foreach (`dmidecode`) {
         $in = 1 if /^\s*Processor Information/;
 
         if ($in) {
             $frequency = $1 if /^\s*Max Speed:\s*(\d+)\s*MHz/i;
             $frequency = $1*1000 if /^\s*Max Speed:\s*(\d+)\s*GHz/i;
-            $serial = $1 if /^\s*ID:\s*(\S.+)/i;
+            $serial = $1 if /^\s*Serial\s*Number:\s*(\S.+)/i;
+            $id = $1 if /^\s*ID:\s*(\S.+)/i;
             $manufacturer = $1 if /Manufacturer:\s*(\S.*)/;
             $thread = int($1) if /Thread Count:\s*(\S.*)/;
             $core = int($1) if /Core Count:\s*(\S.*)/;
             $empty = 1 if /Status:\s*Unpopulated/i;
+            $name = $1 if /^\s*Version:\s*(\S.+)/i;
 
         }
 
@@ -54,6 +58,8 @@ sub doInventory {
 # http://www.amd.com/us-en/assets/content_type/white_papers_and_tech_docs/25481.pdf
                     THREAD => $thread,
                     CORE => $core,
+                    NAME => $name,
+                    ID => $id,
                 }
             }
 
@@ -65,6 +71,7 @@ sub doInventory {
             $empty = undef;
             $empty = undef;
             $core = undef;
+            $name = undef;
 
         }
     }
@@ -111,7 +118,9 @@ sub doInventory {
             $cpu[$id]->{MANUFACTURER} =~ s/CyrixInstead/Cyrix/;
             $cpu[$id]->{MANUFACTURER} =~ s/CentaurHauls/VIA/;
         }
-        $cpu[$id]->{NAME} = $cpuProc->{'model name'};
+        if ($cpuProc->{'model name'}) {
+            $cpu[$id]->{NAME} = $cpuProc->{'model name'};
+        }
         if (!$cpu[$id]->{CORE}) {
             $cpu[$id]->{CORE} = $cpuCoreCpts[$id] || 1;
         }

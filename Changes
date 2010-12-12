@@ -1,5 +1,122 @@
 Revision history for FusionInventory::Agent
 
+2.1.7  Sun, 12 Dec 2010 20:05:16 +01000
+       * RPC: Better message if access is denied
+       * add --no-p2p parameter
+         http://forge.fusioninventory.org/issues/507
+       * initialize $config->{'rpc-trust-localhost'} to avoid a warning
+         with --help
+       * injector: fix the --help, there is no default server
+       * fusioninventory-agent, do not load lib with use to be able to change the @INC first.
+         this is needed for AIX 6.1 prebuilt.
+       * AIX/CPU: use addCPU() and collect the CORE/THREAD
+       * AIX/hardware: fix a typo sysplanar0 instead of sysplana00
+       * AIX/storage: reinitialise temp var correctly
+       * AIX/storage: store the harddrive serial number
+       * AIX/storage: use addStroage
+       * AIX/user: use addUser()
+       * Big Oops, CPUID != CPU serial number, see:
+         http://en.wikipedia.org/wiki/CPUID
+         Revert commit a1c4c665, which is broken because of that:
+         Win32: try to identify dual core CPU even if Windows thinks it two physical CPU
+       * Linux/resolution: fix the parsing for Nouveau, than Remi Collet
+       * Linux: improve the Harddrive detection if lshal is not avalaible,
+         thanks Bernhard DENNER for the initial patch
+         https://bugs.launchpad.net/bugs/682689
+       * No warning if ddcprobe is not avalaible
+
+2.1.7_beta1  Fri, 19 Nov 2010 14:15:08 +0100
+       * replace Cwd::abs_path with File::Spec->rel2abs
+         abs_path fails if the directory doesn't exist yet. This was breaking
+         --basevardir on UNIX system.
+         The problem was fixed on Win32 with the 2.1.5 release. See commit
+          6f376013c8584145a8f824632f1292b3212bd3ca
+          a1f32c62145c46fa176165bba1695420505290b7
+       * Fix regression: Do not empty log file if logfile-maxsize is undef
+         or 0, thanks Remi Collet
+         http://forge.fusioninventory.org/issues/414
+       * Linux/PPC: Fix various warnings in CPU.pm
+       * Linux/PPC: ignore some wrong warning
+       * Linux: CPUS/TYPE renamed to CPUS/NAME
+       * POD: add doc for BIOS/{S,B}MANUFACTURER
+       * POD: fix a syntax error in fusioninventory-agent
+       * use the default basevardir.
+       * POD: clarify, we ignore virtual filesystem like /proc in <DRIVES />
+       * Solaris: move showrev output example in ressources/solaris
+       * Solaris: ignore Zone on Solaris < 5.10
+       * Solaris: collect the UUID on x86
+         http://forge.fusioninventory.org/issues/428
+       * OpenSolaris: collect firmware information even if showrev is not installed
+       * OpenSolaris: support GNU df to collect partition
+       * Solaris: identify zfs filesystem and collect serial number (UUID)
+       * Solaris/Drives.pm code clean up
+       * Solaris/Storages.pm Don't set revision to 'Serial' if revision is empty
+       * MacOSX: No serial & uudi gathered on Mac OS X 10.5 running VirtualBox
+         fail back on ioreg when system_profiler do not give the wanted information
+         http://forge.fusioninventory.org/issues/431
+       * import a dmidecode output on OpenBSD 4.5
+       * BSD/Storage: Avoid warning if model is unknown
+       * BSD/CPU: failback on CPU Family if Version is empty in dmidecode, closes: #439
+         http://forge.fusioninventory.org/issues/439
+       * Linux, distro detection: ensure /etc/issue is parsed last if lsb_release is
+         missing. This way /etc/debian_version is used on Debian 
+       * Linux: correctly parse /etc/resolv.conf to identify the domain
+       * Linux: don't save 2 time the same domain
+       * Linux/ARM: collect the Hardware information from /proc/cpuinfo 
+       * BSD: use sysctl -n hw.model to get the CPU name and frequency
+       * MacOSX: Mem.pm, convert hex string to ASCII when needed, thanks Sylvain la Gravière
+         for the bug report
+         http://forge.fusioninventory.org/issues/440
+       * Screen.pm: Add support for 3 new manufacturer. Backport Adam Buchbinder changes on
+         1.1.x branch
+       * Linux/ARM: collect the Hardware information from /proc/cpuinfo
+       * Windows: Disable dmidecode.exe on Win2003
+         http://forge.fusioninventory.org/issues/379
+       * MacOSX/Drives: don't ignore autofs filesystem, thanks François Legastelois
+         for the bug report
+         http://forge.fusioninventory.org/issues/446
+       * BSD: use mount to identify the filesystem type, this shoud fix bug #450
+         http://forge.fusioninventory.org/issues/450
+       * Win32: try to identify dual core CPU even if Windows thinks it two physical CPU
+       * Win32: no need to change %PATH% anymore
+         http://forge.fusioninventory.org/issues/151
+       * fusioninventory-agent-config, better question for server address 
+       * BIOS: clean up
+          - do not mix motherboard and system information anymore
+          - do not use CPU information do create fake serial anymore
+          - retrieve the SKU number
+       * MacOSX: use ioreg to get the machine serial number
+         http://forge.fusioninventory.org/issues/442
+       * Logger: ensure the logger is load just one time
+       * add fusioninventory-injector in the distribution
+       * Linux: fix: Agent don't give video ram size and video resolution,
+         Eric FREYENS for the fix suggestion.
+	 We now use ddcprobe or Xorg to get the resolution of the main screen.
+	 This fix will be improved in the futur and should be seen as experimental
+	 http://forge.fusioninventory.org/issues/316
+       * Win32: ignore garbage character in the XML, and filter SOFTWARES/VERSION
+         to deal with some very strange case, thanks Mario GZUK for the bug report
+         and RDP access
+         http://forge.fusioninventory.org/issues/415
+       * MacOSX: ignore a warning in Drives.pm
+         http://forge.fusioninventory.org/issues/441
+       * MacOSX: retrieve partition UUID on MacOSX 10.4
+       * Linux, use ddcprobe and Xorg log file to detect the X resolution, turn
+         off the generic Screen.pm module
+       * Solaris/Networks: no ugly hack to detect the Perl bin path to launch kstat
+         http://forge.fusioninventory.org/issues/497
+       * Solaris/Networks: no useless grep call
+       * HTML: add the deviceid in the HTML file
+       * Linux/CPU: workaround if cpuinfo has broken "physical id"
+         http://forge.fusioninventory.org/issues/505
+       * BSD: add support for DragonFlyBSD! :D
+       * VirtualBox: Don't use process list (ps) to find running process
+       * MacOSX/VirtualBox: looks for user dir in /Users on MacOSX
+       * Linux/Storage: ignore fdisk -l error message
+         http://forge.fusioninventory.org/issues/503
+       * Linux/Storage: avoid error message with fdisk -s on invalid devices
+       * RPC: Allow access to / from everywhere
+
 2.1.6    Tue, 05 Oct 2010 21:03:39 +0200
        * Ensure the RPC serivce URL printed in the log message targets
          http://127.0.0.1::62354 with the default settings

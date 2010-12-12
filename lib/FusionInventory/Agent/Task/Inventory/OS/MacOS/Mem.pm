@@ -46,18 +46,29 @@ sub doInventory {
         my $speed;
         my $size;
 
-        if ($_->{'Speed'} =~ /(\d+)\s+(\S+)/) {
+	if ($_->{'Speed'} eq 'PC3200U-30330') {
+	    $speed = 400;
+        } elsif ($_->{'Speed'} =~ /(\d+)\s+(\S+)/) {
             $speed = $1*$speedMatrice{lc($2)};
         }
         if ($_->{'Size'} =~ /(\d+)\s+(\S+)/) {
             $size = $1*$sizeMatrice{lc($2)};
         }
+
+        my $description = $_->{'Part Number'};
+
+	if ($description) {
+	    $description = pack 'H*', $description if $description =~ s/^0x//;
+
+	    $description =~ s/\s*$//;
+	}
+
         $inventory->addMemory({
                 'CAPACITY'      => $size,
                 'SPEED'         => $speed,
                 'TYPE'          => $_->{'Type'},
                 'SERIALNUMBER'  => $_->{'Serial Number'},
-                'DESCRIPTION'   => $_->{'Part Number'},
+                'DESCRIPTION'   => $description,
                 'NUMSLOTS'      => $numSlot++,
                 'CAPTION'       => 'Status: '.$_->{'Status'},
             });

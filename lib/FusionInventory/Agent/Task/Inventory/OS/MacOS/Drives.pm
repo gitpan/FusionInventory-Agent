@@ -37,7 +37,8 @@ sub doInventory {
 
     my %fs;
     foreach (`mount`) {
-        next unless /^\//;
+	next if /^devfs/;
+	next if /^fdesc/;
         if (/on\s.+\s\((\S+?)(,|\))/) {
             $fs{$1} = 1;
         }
@@ -80,7 +81,8 @@ sub doInventory {
 
         my $isHardDrive;
 
-        if ($device->{'Part Of Whole'} eq $device->{'Device Identifier'}) {
+        if ((defined($device->{'Part Of Whole'}) && ($device->{'Part Of Whole'} eq $device->{'Device Identifier'}))) {
+            # Is it possible to have a drive without partition?
             $isHardDrive = 1;
         }
 
@@ -95,7 +97,7 @@ sub doInventory {
 
         if (!$isHardDrive) {
             $drives{$deviceName}->{TOTAL} = $size;
-            $drives{$deviceName}->{SERIAL} = $device->{'Volume UUID'};
+            $drives{$deviceName}->{SERIAL} = $device->{'Volume UUID'} || $device->{'UUID'};
             $drives{$deviceName}->{FILESYSTEM} = $device->{'File System'} || $device->{'Partition Type'};
             $drives{$deviceName}->{VOLUMN} = $deviceName;
             $drives{$deviceName}->{LABEL} = $device->{'Volume Name'};

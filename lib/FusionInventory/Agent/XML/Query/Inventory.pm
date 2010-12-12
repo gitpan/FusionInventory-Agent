@@ -152,10 +152,13 @@ sub _encode {
         |  \xF4[\x80-\x8F][\x80-\xBF]{2}     # plane 16
         )*\z/x) {
 #        $logger->debug("Non-UTF8 string: $string");
-        return encode("UTF-8", $string);
-    } else {
-        return $string;
+        $string = encode("UTF-8", $string);
     }
+
+    # remove ctrl char
+    $string =~ s/[[:cntrl:]]//g;
+
+    return $string;
 }
 
 =item initialise()
@@ -483,6 +486,7 @@ sub addVideo {
         MEMORY
         NAME
         RESOLUTION
+	PCISLOT
     /;
 
     $self->_addEntry({
@@ -622,7 +626,7 @@ sub setBios {
 
     foreach my $key (qw/SMODEL SMANUFACTURER SSN BDATE BVERSION BMANUFACTURER
         MMANUFACTURER MSN MMODEL ASSETTAG ENCLOSURESERIAL BASEBOARDSERIAL
-        BIOSSERIAL TYPE/) {
+        BIOSSERIAL TYPE SKUNUMBER/) {
 
         if (exists $args->{$key}) {
             my $string = $self->_encode({ string => $args->{$key} });
@@ -648,6 +652,7 @@ sub addCPU {
         THREAD
         SERIAL
         SPEED
+        ID
     /;
 
     $self->_addEntry({
@@ -1129,7 +1134,8 @@ sub writeHTML {
     </head>
     <body>
     <h1>Inventory for '.$target->{deviceid}.'</h1>
-    FusionInventory Agent '.$config->{VERSION}.'
+    FusionInventory Agent '.$config->{VERSION}.'<br />
+    <small>DEVICEID '.$target->{deviceid}.'</small>
 
     ';
 
@@ -1382,6 +1388,8 @@ is based on OCS Inventory XML with various additions.
 
 =item SMANUFACTURER
 
+System manufacturer
+
 =item SSN
 
 =item BDATE
@@ -1392,11 +1400,19 @@ The BIOS revision
 
 =item BMANUFACTURER
 
+BIOS manufacturer
+
 =item MMANUFACTURER
+
+Motherboard Manufacturer
 
 =item MSN
 
+Motherboard Serial
+
 =item MMODEL
+
+Motherboard model
 
 =item ASSETTAG
 
@@ -1511,17 +1527,21 @@ Number of thread per core.
 
 =item SERIAL
 
-CPU Id/Serial
+Serial number
 
 =item SPEED
 
 Frequency in MHz
 
+=item ID
+
+The CPU ID: http://en.wikipedia.org/wiki/CPUID
+
 =back
 
 =head2 DRIVES
 
-Drive is actually a filesystem.
+Drive is actually a filesystem. Virtual filesystem like /proc or /sys are ignored.
 
 =over 4
 
@@ -1549,7 +1569,7 @@ Windows driver letter. Windows only
 
 =item SERIAL
 
-Partition serial number
+Partition serial number or UUID
 
 =item SYSTEMDRIVE
 
@@ -1835,11 +1855,17 @@ The Windows domain of the user, if available.
 
 =item MEMORY
 
+Video card memory in MB
+
 =item NAME
 
 =item RESOLUTION
 
 Resolution in pixel. 1024x768.
+
+=item PCISLOT
+
+The local PCI slot ID if the video card use PCI.
 
 =back
 
@@ -1993,6 +2019,8 @@ The name of the device (optional)
 If the interface exist or not (1 or empty)
 
 =item SLAVES
+
+Bonded interfaces list in the eth0/eth1/eth2 format (/ is the separator).
 
 =item MANAGEMENT
 
