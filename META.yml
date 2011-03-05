@@ -3,6 +3,7 @@ abstract: 'FusionInventory unified Agent for UNIX, Linux, Windows and MacOSX'
 build_requires:
   ExtUtils::MakeMaker: 6.42
   Test::More: 0
+  XML::TreePP: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
@@ -34,4 +35,4 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.1.7
+version: 2.1.8_rc1

@@ -7,6 +7,9 @@ contrib/fedora/README
 contrib/FusionInventory.adml
 contrib/FusionInventory.admx
 contrib/Tarballs.pm
+contrib/yum-plugin/fusioninventory-agent.conf
+contrib/yum-plugin/fusioninventory-agent.py
+contrib/yum-plugin/INSTALL
 etc/cron.d/fusioninventory-agent
 etc/default/fusioninventory-agent
 etc/fusioninventory/agent.cfg
@@ -220,8 +223,9 @@ lib/FusionInventory/Agent/Task/Inventory/Virtualization/Vserver.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Xen.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Xen/XM.pm
 lib/FusionInventory/Agent/Task/Inventory/WinRegistry.pm
-lib/FusionInventory/Agent/Task/Ping.pm
 lib/FusionInventory/Agent/Task/WakeOnLan.pm
+lib/FusionInventory/Agent/Tools.pm
+lib/FusionInventory/Agent/Tools/Win32.pm
 lib/FusionInventory/Agent/XML/Query.pm
 lib/FusionInventory/Agent/XML/Query/Inventory.pm
 lib/FusionInventory/Agent/XML/Query/Prolog.pm
@@ -256,6 +260,7 @@ resources/cpuinfo/linux-mips-1
 resources/cpuinfo/linux-ppc-1
 resources/cpuinfo/linux-ppc-2
 resources/cpuinfo/linux-sparc-1
+resources/cpuinfo/toshiba-r630-2-core
 resources/ddcprobe/98LMTF053166
 resources/ddcprobe/B101AW03
 resources/ddcprobe/B154EW02
@@ -274,14 +279,18 @@ resources/dmidecode-openbsd-3.8
 resources/dmidecode-openbsd-4.5
 resources/dmidecode-S3000AHLX
 resources/dmidecode-S5000VSA
+resources/dmidecode.esx2.5
 resources/dmidecode.rhel.2.1
 resources/dmidecode.rhel.3.4
 resources/dmidecode.rhel.4.3
 resources/dmidecode.rhel.4.6
 resources/hal/dell-xt2
 resources/hal/rh4-kvm
+resources/machinfo/hpux_11.23.ia64
+resources/machinfo/hpux_11.31_3xia64
 resources/opensolaris/release-1
 resources/opensolaris/smbios-1
+resources/osx/system_profiler_10.4.11-intel.txt
 resources/osx/system_profiler_datatypes
 resources/osx/system_profiler_full_10.4-powerpc.txt
 resources/osx/system_profiler_full_10.5-powerpc.txt
@@ -317,6 +326,7 @@ t/compile.t
 t/critic.t
 t/dmidecode.t
 t/drives.t
+t/hpux-cpu.t
 t/inventory-xml.t
 t/README.t
 t/storages.t
