@@ -398,10 +398,20 @@ location of your log file. <strong>--logfile</strong> turns this option on autom
 <pre>
  % fusioinventory-agent --logger=Syslog,Stderr --local=/tmp</pre>
 </dd>
+<dt><strong><a name="no_deploy" class="item"><strong>--no-deploy</strong></a></strong></dt>
+
+<dd>
+<p>Disable the software deployment (new module).</p>
+</dd>
+<dt><strong><a name="no_esx" class="item"><strong>--no-esx</strong></a></strong></dt>
+
+<dd>
+<p>Disable the ESX inventory task.</p>
+</dd>
 <dt><strong><a name="no_ocsdeploy" class="item"><strong>--no-ocsdeploy</strong></a></strong></dt>
 
 <dd>
-<p>Disable the software deployment.</p>
+<p>Disable the software deployment (OCS compatible module).</p>
 </dd>
 <dt><strong><a name="no_inventory" class="item"><strong>--no-inventory</strong></a></strong></dt>
 
@@ -576,7 +586,8 @@ is ignored.</p>
 <h1><a name="security">SECURITY</a></h1>
 <p>Some modules like SNMPQuery needs to sent credential from the agent to the
 agent. We recommend to enable HTTPS support on the OCS or FusionInventory
-For GLPI server.</p>
+For GLPI server. We also recommend to use only trusted machine as agent in
+this case.</p>
 <p>
 </p>
 <hr />
@@ -635,8 +646,7 @@ FusionInventory.</p>
 </p>
 <hr />
 <h1><a name="bugs">BUGS</a></h1>
-<p>Please, use the mailing lists as much as possible. You can open your own bug
-tickets. Patches are welcome. You can also use the bugtracker on
+<p>Please, use the mailing lists as much as possible. You can also use the bugtracker on
 <a href="http://forge.fusionInventory.org">http://forge.fusionInventory.org</a></p>
 <p>
 </p>

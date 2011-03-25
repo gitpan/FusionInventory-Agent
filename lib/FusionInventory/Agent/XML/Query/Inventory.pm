@@ -23,6 +23,7 @@ use XML::Simple;
 use Digest::MD5 qw(md5_base64);
 use Config;
 
+use FusionInventory::Agent;
 use FusionInventory::Agent::Task::Inventory;
 
 =over 4
@@ -72,7 +73,7 @@ sub new {
     $self->{h}{CONTENT}{USBDEVICES} = [];
     $self->{h}{CONTENT}{BATTERIES} = [];
     $self->{h}{CONTENT}{ANTIVIRUS} = [];
-    $self->{h}{CONTENT}{VERSIONCLIENT} = ['FusionInventory-Agent_v'.$config->{VERSION}];
+    $self->{h}{CONTENT}{VERSIONCLIENT} = ['FusionInventory-Agent_v'.$FusionInventory::Agent::VERSION];
 
     # Is the XML centent initialised?
     $self->{isInitialised} = undef;
@@ -570,6 +571,8 @@ sub addNetwork {
         SLAVES
         SPEED
         MANAGEMENT
+        BSSID
+        SSID
     /;
 
 
@@ -791,6 +794,8 @@ sub addVirtualMachine {
         VCPU
         VMID
         MAC
+        COMMENT
+        OWNER
     /;
 
     if (!$args->{STATUS}) {
@@ -1143,7 +1148,7 @@ sub writeHTML {
     </head>
     <body>
     <h1>Inventory for '.$target->{deviceid}.'</h1>
-    FusionInventory Agent '.$config->{VERSION}.'<br />
+    FusionInventory Agent '.$FusionInventory::Agent::VERSION.'<br />
     <small>DEVICEID '.$target->{deviceid}.'</small>
 
     ';
@@ -1840,6 +1845,8 @@ Installation day in DD/MM/YYYY format. Windows only.
 
 =item NO_REMOVE
 
+Can the software be removed.
+
 =item RELEASE_TYPE
 
 Windows only for now, come from the registry
@@ -1944,6 +1951,12 @@ The ID of virtual machine in the virtual managment system.
 =item MAC
 
 The list of the MAC addresses of the virtual machine. The delimiter is '/'. e.g: 00:23:18:91:db:8d/00:23:57:31:sb:8e
+
+=item COMMENT
+
+a comment
+
+=item OWNER
 
 =back
 
@@ -2069,7 +2082,7 @@ Up or Down
 
 =item TYPE
 
-deprecated
+Interface type: Ethernet, Wifi
 
 =item VIRTUALDEV
 
@@ -2086,6 +2099,14 @@ Whether or not it is a HP iLO, Sun SC, HP MP or other kind of Remote Management 
 =item SPEED
 
 Interface speed in Mb/s
+
+=item BSSID
+
+Wifi only, Access point MAC Address
+
+=item SSID
+
+Wifi only, Access point name
 
 =back
 

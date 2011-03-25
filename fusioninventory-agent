@@ -391,9 +391,17 @@ You can use more than one parameter if you use ',' as delimiter. E.g:
 
  % fusioinventory-agent --logger=Syslog,Stderr --local=/tmp
 
+=item B<--no-deploy>
+
+Disable the software deployment (new module).
+
+=item B<--no-esx>
+
+Disable the ESX inventory task.
+
 =item B<--no-ocsdeploy>
 
-Disable the software deployment.
+Disable the software deployment (OCS compatible module).
 
 =item B<--no-inventory>
 
@@ -558,7 +566,8 @@ The command line parameters overwrite the configuration file.
 
 Some modules like SNMPQuery needs to sent credential from the agent to the
 agent. We recommend to enable HTTPS support on the OCS or FusionInventory
-For GLPI server.
+For GLPI server. We also recommend to use only trusted machine as agent in
+this case.
 
 =head1 AUTHORS
 
@@ -621,8 +630,7 @@ IRC: #FusionInventory on FreeNode IRC Network
 
 =head1 BUGS
 
-Please, use the mailing lists as much as possible. You can open your own bug
-tickets. Patches are welcome. You can also use the bugtracker on
+Please, use the mailing lists as much as possible. You can also use the bugtracker on
 http://forge.fusionInventory.org
 
 

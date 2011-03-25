@@ -336,3 +336,4 @@ t/xml-query-simplemessage.t
 t/xml-response.t
 THANKS
 tools/refresh-doc.sh
+tools/updatePciids.sh

@@ -11,7 +11,7 @@ use File::Path;
 use XML::Simple;
 use Sys::Hostname;
 
-our $VERSION = '2.1.8_rc1';
+our $VERSION = '2.1.8';
 $ENV{LC_ALL} = 'C'; # Turn off localised output for commands
 $ENV{LANG} = 'C'; # Turn off localised output for commands
 
@@ -266,11 +266,13 @@ sub main {
         });
 
         my @tasks = qw/
+            Deploy
             OcsDeploy
             Inventory
             WakeOnLan
             SNMPQuery
             NetDiscovery
+            ESX
             /;
 
         foreach my $module (@tasks) {

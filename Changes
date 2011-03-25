@@ -1,5 +1,26 @@
 Revision history for FusionInventory::Agent
 
+2.1.8  Fri, 25 Mar 2011 16:09:15 +0100
+       * Show a larger part of the string returned by the server in case of
+         error
+       * Win32: Decrease the severity of a winkey read error
+       * add FusionInventory::Agent::Tools::Win32::getValueFromRegistry()
+         unused for now.
+       * Win32: getWmiProperties() depends on Win32::OLE, load it first.
+       * Win32/AntiVirus: avoid pointless OLE error
+       * Add BNQ screen manufacturer support
+         https://bugs.launchpad.net/bugs/736095
+       * scan-homedirs and rpc-trust-localhost don't works in command line
+         http://forge.fusioninventory.org/issues/636
+       * Update the Inventory XML documentation
+       * HPUX: use NAME instead of TYPE to set the CPU name (Yanick Durant)
+         http://forum.fusioninventory.org/viewtopic.php?id=278
+       * Document NETWORKS/{BSSID,SSID}
+       * Add VIRTUALMACHINES/COMMENT and OWNER keys
+       * VirtualBox: major rewrite of the mostly broken Vbox mod
+       * add support for the task called «Deploy»
+       * add support for the task called «ESX»
+
 2.1.8_rc1  Sat, 05 Mar 2011 14:56:58 +0100
        * Linux, correctly read the number of core from /proc/cpuinfo
        * MacOSX: KB unit in missing in Mac OS X Drive.pm

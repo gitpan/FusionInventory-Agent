@@ -263,8 +263,14 @@ OPTIONS
 
          % fusioinventory-agent --logger=Syslog,Stderr --local=/tmp
 
+    --no-deploy
+        Disable the software deployment (new module).
+
+    --no-esx
+        Disable the ESX inventory task.
+
     --no-ocsdeploy
-        Disable the software deployment.
+        Disable the software deployment (OCS compatible module).
 
     --no-inventory
         Do not generate inventory.
@@ -398,7 +404,8 @@ CONFIG FILE
 SECURITY
     Some modules like SNMPQuery needs to sent credential from the agent to
     the agent. We recommend to enable HTTPS support on the OCS or
-    FusionInventory For GLPI server.
+    FusionInventory For GLPI server. We also recommend to use only trusted
+    machine as agent in this case.
 
 AUTHORS
     The FusionInventory project
@@ -431,9 +438,8 @@ SEE ALSO
     *   IRC: #FusionInventory on FreeNode IRC Network
 
 BUGS
-    Please, use the mailing lists as much as possible. You can open your own
-    bug tickets. Patches are welcome. You can also use the bugtracker on
-    http://forge.fusionInventory.org
+    Please, use the mailing lists as much as possible. You can also use the
+    bugtracker on http://forge.fusionInventory.org
 
 COPYRIGHT
     Copyright (C) 2006-2010 OCS Inventory contributors Copyright (C)
