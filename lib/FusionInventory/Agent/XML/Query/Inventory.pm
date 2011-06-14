@@ -74,6 +74,10 @@ sub new {
     $self->{h}{CONTENT}{BATTERIES} = [];
     $self->{h}{CONTENT}{ANTIVIRUS} = [];
     $self->{h}{CONTENT}{VERSIONCLIENT} = ['FusionInventory-Agent_v'.$FusionInventory::Agent::VERSION];
+    $self->{h}{CONTENT}{LOGICAL_VOLUMES} = [];
+    $self->{h}{CONTENT}{PHYSICAL_VOLUMES} = [];
+    $self->{h}{CONTENT}{VOLUME_GROUPS} = [];
+
 
     # Is the XML centent initialised?
     $self->{isInitialised} = undef;
@@ -611,7 +615,7 @@ sub setHardware {
         PROCESSORT NAME PROCESSORS SWAP ETIME TYPE OSNAME IPADDR WORKGROUP
         DESCRIPTION MEMORY UUID DNS LASTLOGGEDUSER USERDOMAIN
         DATELASTLOGGEDUSER DEFAULTGATEWAY VMSYSTEM WINOWNER WINPRODID
-        WINPRODKEY WINCOMPANY WINLANG/) {
+        WINPRODKEY WINCOMPANY WINLANG CHASSIS_TYPE/) {
 # WINLANG: Windows Language, see MSDN Win32_OperatingSystem documentation
         if (exists $args->{$key}) {
             if ($key eq 'PROCESSORS' && !$nonDeprecated) {
@@ -968,6 +972,60 @@ sub addAntiVirus {
     });
 }
 
+=item addLogicalVolume()
+
+Registered LVM Logical Volume
+
+=cut
+sub addLogicalVolume {
+    my ($self, $args) = @_;
+
+    my @fields = qw/LV_NAME VG_NAME ATTR SIZE LV_UUID SEG_COUNT/;
+
+    $self->_addEntry({
+        'field' => \@fields,
+        'sectionName' => 'LOGICAL_VOLUMES',
+        'values' => $args,
+        'noDuplicated' => 1
+    });
+}
+
+=item addPhysicalVolume()
+
+Registered LVM Physical Volume
+
+=cut
+sub addPhysicalVolume {
+    my ($self, $args) = @_;
+
+    my @fields = qw/DEVICE PV_NAME PV_PE_COUNT PV_UUID FORMAT ATTR SIZE FREE PE_SIZE/;
+
+    $self->_addEntry({
+        'field' => \@fields,
+        'sectionName' => 'PHYSICAL_VOLUMES',
+        'values' => $args,
+        'noDuplicated' => 1
+    });
+}
+
+=item addVolumeGroup()
+
+Registered LVM Volume Group
+
+=cut
+sub addVolumeGroup {
+    my ($self, $args) = @_;
+
+    my @fields = qw/VG_NAME PV_COUNT LV_COUNT ATTR SIZE FREE VG_UUID VG_EXTENT_SIZE/;
+
+    $self->_addEntry({
+        'field' => \@fields,
+        'sectionName' => 'VOLUME_GROUPS',
+        'values' => $args,
+        'noDuplicated' => 1
+    });
+}
+
 
 =item setAccessLog()
 
@@ -1093,9 +1151,9 @@ sub writeXML {
     my $config = $self->{config};
     my $target = $self->{target};
 
-    if ($target->{path} =~ /^$/) {
-        $logger->fault ('local path unititalised!');
-    }
+#    if ($target->{path} =~ /^$/) {
+#        $logger->fault ('local path unititalised!');
+#    }
 
     $self->initialise();
 
@@ -1127,9 +1185,9 @@ sub writeHTML {
     my $config = $self->{config};
     my $target = $self->{target};
 
-    if ($target->{path} =~ /^$/) {
-        $logger->fault ('local path unititalised!');
-    }
+#    if ($target->{path} =~ /^$/) {
+#        $logger->fault ('local path unititalised!');
+#    }
 
     $self->initialise();
 
@@ -1252,9 +1310,9 @@ sub processChecksum {
     );
     # TODO CPUS is not in the list
 
-    if (!$self->{target}->{vardir}) {
-        $logger->fault ("vardir uninitialised!");
-    }
+#    if (!$self->{target}->{vardir}) {
+#        $logger->fault ("vardir uninitialised!");
+#    }
 
     my $checksum = 0;
 
@@ -1437,6 +1495,10 @@ Motherboard model
 =item BIOSSERIAL
 
 The optional asset tag for this machine.
+
+=item TYPE
+
+depcreated, replace by HARDWARE/CHASSIS_TYPE
 
 =back
 
@@ -1686,7 +1748,35 @@ This field is deprecated, you should use the USERS section instead.
 
 The virtualization technologie used if the machine is a virtual machine.
 
-Can by: Physical (default), Xen, VirtualBox, Virtual Machine, VMware, QEMU, SolarisZone
+Can by:
+
+=over 5
+
+=item Physical: (default)
+
+=item Xen
+
+=item VirtualBox
+
+=item Virtual Machine: Generic if it's not possible to correctly identify the solution
+
+=item VMware: ESX, ESXi, server, etc
+
+=item QEMU
+
+=item SolarisZone
+
+=item VServer
+
+=item OpenVZ
+
+=item BSDJail
+
+=item Parallels
+
+=item Hyper-V
+
+=back
 
 =item WINOWNER
 
@@ -1697,6 +1787,10 @@ Can by: Physical (default), Xen, VirtualBox, Virtual Machine, VMware, QEMU, Sola
 =item WINCOMPANY
 
 =item WINLANG
+
+=item CHASSIS_TYPE
+
+The computer chassis format (e.g: Notebook, Laptop, Server, etc)
 
 =back
 
@@ -2239,3 +2333,106 @@ Unique ID
 1 if the antivirus is up to date.
 
 =item VERSION
+
+=back
+
+=head2 LOGICAL_VOLUMES
+
+A LVM Logical Volume
+
+=over 4
+
+=item LV_NAME
+
+The logical volume name.
+
+=item LV_UUID
+
+The logical volume UUID.
+
+=item ATTR
+
+The special attribue used on this volume (e.g: a-)
+
+=item SIZE
+
+The size of the volume on MB.
+
+=item VG_UUID
+
+The volume group UUID.
+
+=back
+
+=head2 PHYSICAL_VOLUMES
+
+=over 4
+
+=item DEVICE
+
+The device name. Eg.: /dev/sda1 on Linux.
+
+=item PV_NAME
+
+The physical device name.
+
+=item FORMAT
+
+The format. E.g: lvm2.
+
+=item ATTR
+
+The LVM attribue in use for this phyisical device.
+
+=item SIZE
+
+The size in MB.
+
+=item PV_UUID
+
+The UUID.
+
+=item PV_PE_COUNT
+
+Item PV_PE_COUNT
+
+
+=item PE_SIZE
+
+Item PE_SIZE
+
+=back
+
+=head2 VOLUME_GROUPS
+
+A LVM Volume group.
+
+=over 4
+
+=item VG_NAME
+
+The name of the volume group.
+
+=item PV_COUNT
+
+=item LV_COUNT
+
+=item ATTR
+
+The volume group LVM attribue.
+
+=item SIZE
+
+The size.
+
+=item FREE
+
+The free space.
+
+=item VG_UUID
+
+The volume group UUID
+
+=item VG_EXTENT_SIZE
+
+

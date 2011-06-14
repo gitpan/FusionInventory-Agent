@@ -96,7 +96,30 @@ sub createUA {
     $logger->fault("Unsupported protocol $protocol")
         unless $protocol eq 'http' or $protocol eq 'https';
 
-    my $ua = LWP::UserAgent->new(keep_alive => 1);
+    if ($config->{'no-ssl-check'}) {
+        if (!$config->{SslCheckWarningShown}) {
+            $logger->info( "--no-ssl-check parameter "
+                . "found. Don't check server identity!!!" );
+            $config->{SslCheckWarningShown} = 1;
+        }
+    }
+
+
+    my $ua = LWP::UserAgent->new(keep_alive => 1, requests_redirectable => ['POST', 'GET', 'HEAD']);
+
+
+    if ($LWP::VERSION > 6) {
+        # LWP6 default behavior is to check the SSL hostname
+        if ($config->{'no-ssl-check'}) {
+            $ua->ssl_opts(verify_hostname => 0);
+        }
+        if ($config->{'ca-cert-file'}) {
+            $ua->ssl_opts(SSL_ca_file => $config->{'ca-cert-file'});
+        }
+        if ($config->{'ca-cert-dir'}) {
+            $ua->ssl_opts(SSL_ca_path => $config->{'ca-cert-dir'});
+        }
+    }
 
     if ($noProxy) {
 
@@ -207,7 +230,7 @@ sub send {
 
 
     my $serverRealm;
-    if ($res->code == '401' && $res->header('www-authenticate') =~ /^Basic realm="(.*)"/ && !$self->{config}->{realm}) {
+    if ($res && $res->code == '401' && $res->header('www-authenticate') =~ /^Basic realm="(.*)"/ && !$self->{config}->{realm}) {
         $serverRealm = $1;
         $logger->debug("Basic HTTP Auth: fixing the realm to '$serverRealm' and retrying.");
 
@@ -222,10 +245,10 @@ sub send {
     }
 
     # Checking if connected
-    if(!$res->is_success) {
+    if(!$res || !$res->is_success) {
         $logger->error ('Cannot establish communication with `'.
             $self->{URI}.': '.
-            $res->status_line.'`');
+            (($res && $res->status_line) || 'Internal error' ).'`');
         return;
     }
 
@@ -276,14 +299,7 @@ sub turnSSLCheckOn {
     my $config = $self->{config};
 
 
-    if ($config->{'no-ssl-check'}) {
-        if (!$config->{SslCheckWarningShown}) {
-            $logger->info( "--no-ssl-check parameter "
-                . "found. Don't check server identity!!!" );
-            $config->{SslCheckWarningShown} = 1;
-        }
-        return;
-    }
+    return if $config->{'no-ssl-check'};
 
     if (!$config->{'ca-cert-file'} && !$config->{'ca-cert-dir'}) {
         $logger->debug("You may need to use either --ca-cert-file ".
@@ -300,6 +316,7 @@ sub turnSSLCheckOn {
         }
 
         $ENV{HTTPS_CA_FILE} = $config->{'ca-cert-file'};
+        $ENV{PERL_LWP_SSL_CA_FILE} = $config->{'ca-cert-file'};
 
     } elsif ($config->{'ca-cert-dir'}) {
         if (!-d $config->{'ca-cert-dir'}) {
@@ -307,7 +324,8 @@ sub turnSSLCheckOn {
                 "`".$config->{'ca-cert-dir'}."'");
         }
 
-        $ENV{HTTPS_CA_DIR} =$config->{'ca-cert-dir'};
+        $ENV{HTTPS_CA_DIR} = $config->{'ca-cert-dir'};
+        $ENV{PERL_LWP_SSL_CA_PATH} = $config->{'ca-cert-dir'};
 
     }
 
@@ -333,17 +351,20 @@ sub setSslRemoteHost {
     if ($self->{URI} !~ /^https:/i) {
         return;
     }
-    $self->turnSSLCheckOn();
 
+# Compatibility with LWP5
+    if ($LWP::VERSION < 6) {
+        $self->turnSSLCheckOn();
     # Check server name against provided SSL certificate
-    if ( $self->{URI} =~ /^https:\/\/([^\/]+).*$/i ) {
-        my $re = $1;
-        # Accept SSL cert will hostname with wild-card
-        # http://forge.fusioninventory.org/issues/542
-        $re =~ s/^([^\.]+)/($1|\\*)/;
-        # protect some characters, $re will be evaluated as a regex
-        $re =~ s/([\-\.])/\\$1/g;
-        $ua->default_header('If-SSL-Cert-Subject' => '/CN='.$re.'($|\/)');
+        if ( $self->{URI} =~ /^https:\/\/([^\/]+).*$/i ) {
+            my $re = $1;
+# Accept SSL cert will hostname with wild-card
+# http://forge.fusioninventory.org/issues/542
+            $re =~ s/^([^\.]+)/($1|\\*)/;
+# protect some characters, $re will be evaluated as a regex
+            $re =~ s/([\-\.])/\\$1/g;
+            $ua->default_header('If-SSL-Cert-Subject' => '/CN='.$re.'($|\/)');
+        }
     }
 }
 

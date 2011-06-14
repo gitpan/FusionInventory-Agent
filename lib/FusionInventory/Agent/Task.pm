@@ -60,6 +60,8 @@ sub run {
     my $cmd;
     $cmd .= "\"$EXECUTABLE_NAME\""; # The Perl binary path
     if ($^O eq "MSWin32") {
+        $ENV{PERL5LIB}="";
+        $ENV{PERLLIB}="";
         $cmd .= "  -Ilib" if $config->{devlib};
         $cmd .= " -MFusionInventory::Agent::Task::".$module;
         $cmd .= " -e \"FusionInventory::Agent::Task::".$module."::main();\" --";

@@ -80,6 +80,13 @@ sub parseDmidecode {
 		$bios->{SKUNUMBER} = $1;
 		$bios->{SKUNUMBER} =~ s/\s$//;
 	    }
+
+            if ($bios->{SMANUFACTURER} &&
+            $bios->{SMANUFACTURER} =~ /^Microsoft Corporation$/ &&
+            $bios->{SMODEL} &&
+            $bios->{SMODEL} =~ /Virtual Machine/) {
+                    $hardware->{VMSYSTEM} = 'Hyper-V';
+            }
             next;
         }
 
@@ -100,6 +107,9 @@ sub parseDmidecode {
         if ($type == 3) {
             if ($line =~ /^\s+Asset Tag:\s*(.+\S)/i) {
                 $bios->{ASSETTAG} = $1 eq 'Not Specified'  ? '' : $1;
+            }
+            if ($line =~ /^\s+Type:\s*(.+\S)/i) {
+                $hardware->{CHASSIS_TYPE} = $1;
             }
             next;
         }
