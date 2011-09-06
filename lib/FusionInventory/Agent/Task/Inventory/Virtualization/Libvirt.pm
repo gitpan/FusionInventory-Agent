@@ -22,13 +22,24 @@ sub doInventory {
     }
 
     while (my $line = <$handle>) {
-        if ($line =~ /^\s+(\d+|\-)\s+(\S+)\s+(\S.+)/) {
+        next if $line =~ /^\s*Id/;
+        next if $line =~ /^-{5}/;
+
+        if ($line =~ /^\s*(\d+|\-)\s+(\S+)\s+(\S.+)/) {
+            my $vmid = $1;
+            # hack to avoid a warning if $1 is not a int
+            # better fix in 2.2.x branch
+            $vmid = 0 unless $vmid =~ /^\d+$/;
             my $name = $2;
             my $status = $3;
+
+            # Xen DomU
+            next if $name eq 'Domain-0';
+
             $status =~ s/^shut off/off/;
 
             my $xml = `virsh dumpxml $name`;
-            my $data = XMLin($xml);
+            my $data = eval { XMLin($xml) };
 
             my $vcpu = $data->{vcpu};
             my $uuid = $data->{uuid};
@@ -45,6 +56,7 @@ sub doInventory {
                 STATUS => $status,
                 SUBSYSTEM => $vmtype,
                 VMTYPE => "libvirt",
+                VMID => $vmid,
                 VCPU   => $vcpu,
             };
 

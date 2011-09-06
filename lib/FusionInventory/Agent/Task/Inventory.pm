@@ -32,7 +32,7 @@ use FusionInventory::Logger;
 sub main {
     my $self = FusionInventory::Agent::Task::Inventory->new();
 
-    if ($self->{target}->{type} eq 'server' &&
+    if ((!$self->{config}->{force} && ($self->{target}->{type} eq 'server')) &&
         (
             !exists($self->{prologresp}->{parsedcontent}->{RESPONSE}) ||
             $self->{prologresp}->{parsedcontent}->{RESPONSE} !~ /^SEND$/
@@ -147,8 +147,15 @@ sub initModList {
                     }
                 }
             } else {
-                chomp(my $binpath=`which $binary 2>/dev/null`);
-                $ret = -x $binpath;
+                foreach (split(':', $ENV{PATH})) {
+                    next unless -x "$_/$binary";
+                    $ret = 1;
+                    last;
+                }
+                if (!$ret) {
+                    chomp(my $binpath=`which $binary 2>/dev/null`);
+                    $ret = -x $binpath;
+                }
             }
 
             return $ret;

@@ -58,6 +58,7 @@ lib/FusionInventory/Agent/Task/Inventory/OS/AIX/Domains.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/AIX/Drives.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/AIX/Hardware.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/AIX/IPv4.pm
+lib/FusionInventory/Agent/Task/Inventory/OS/AIX/LVM.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/AIX/Mem.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/AIX/Memory.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/AIX/Modems.pm
@@ -143,6 +144,7 @@ lib/FusionInventory/Agent/Task/Inventory/OS/Linux/Archs/SPARC.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Linux/Archs/SPARC/CPU.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Linux/Distro/LSB.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Linux/Distro/NonLSB.pm
+lib/FusionInventory/Agent/Task/Inventory/OS/Linux/Distro/SuSE.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Linux/Domains.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Linux/Drives.pm
 lib/FusionInventory/Agent/Task/Inventory/OS/Linux/Inputs.pm
@@ -290,6 +292,7 @@ resources/dmidecode.rhel.4.3
 resources/dmidecode.rhel.4.6
 resources/gentoo/equery/0.1.4
 resources/gentoo/equery/0.3.0
+resources/gentoo/equery/README
 resources/hal/dell-xt2
 resources/hal/rh4-kvm
 resources/hp-proLiant-DL120-G6
@@ -353,6 +356,8 @@ t/compile.t
 t/critic.t
 t/dmidecode.t
 t/drives.t
+t/FusionInventory/Test/Auth.pm
+t/FusionInventory/Test/Server.pm
 t/gentoo-equery.t
 t/hpux.t
 t/inventory-xml.t
@@ -361,6 +366,22 @@ t/inventory/linux/lvm.t
 t/inventory/macos/video.t
 t/README.t
 t/rhn-systemid.t
+t/ssl.t
+t/ssl/cnf/alternate.cnf
+t/ssl/cnf/bad.cnf
+t/ssl/cnf/ca.cnf
+t/ssl/cnf/good.cnf
+t/ssl/cnf/wrong.cnf
+t/ssl/crt/alternate.pem
+t/ssl/crt/bad.pem
+t/ssl/crt/ca.pem
+t/ssl/crt/good.pem
+t/ssl/crt/wrong.pem
+t/ssl/key/alternate.pem
+t/ssl/key/bad.pem
+t/ssl/key/ca.pem
+t/ssl/key/good.pem
+t/ssl/key/wrong.pem
 t/storages.t
 t/video-linux.t
 t/xml-query-inventory.t

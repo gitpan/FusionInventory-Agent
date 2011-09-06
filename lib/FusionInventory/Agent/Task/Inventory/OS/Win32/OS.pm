@@ -121,6 +121,14 @@ sub doInventory {
             SWAP => int(($Properties->{TotalSwapSpaceSize}||0)/(1024*1024)),
             DESCRIPTION => $description,
         });
+
+        $inventory->setOperatingSystem({
+            NAME                 => "Windows",
+#            VERSION              => $OSVersion,
+            KERNEL_VERSION       => $Properties->{Version},
+            FULL_NAME            => $Properties->{Caption},
+            SERVICE_PACK         => $Properties->{CSDVersion}
+        });
     }
 
     foreach my $Properties (getWmiProperties('Win32_ComputerSystem', qw/

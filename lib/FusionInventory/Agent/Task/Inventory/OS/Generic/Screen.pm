@@ -13,7 +13,7 @@ package FusionInventory::Agent::Task::Inventory::OS::Generic::Screen;
 
 #     You should have received a copy of the GNU General Public License
 #     along with this program; if not, write to the Free Software
-#     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Some part come from Mandriva's (great) monitor-edid
 # http://svn.mandriva.com/cgi-bin/viewvc.cgi/soft/monitor-edid/trunk/
@@ -41,6 +41,7 @@ sub getScreens {
     if ($OSNAME eq 'MSWin32') {
         my $Registry;
         eval {
+            require FusionInventory::Agent::Tools::Win32;
             require FusionInventory::Agent::Task::Inventory::OS::Win32;
             require Win32::TieRegistry;
             Win32::TieRegistry->import(
@@ -69,11 +70,22 @@ sub getScreens {
 
             my $machKey;
             {
+                my $KEY_WOW64_64KEY = 0x100;
+
+                my $access;
+
+                if (FusionInventory::Agent::Tools::Win32::is64bit()) {
+                    $access = Win32::TieRegistry::KEY_READ() | $KEY_WOW64_64KEY;
+                } else {
+                    $access = Win32::TieRegistry::KEY_READ();
+                }
+
                 # Win32-specifics constants can not be loaded on non-Windows OS
                 no strict 'subs';
                 $machKey = $Registry->Open('LMachine', {
-                    Access => Win32::TieRegistry::KEY_READ
+                    Access => $access
                 } ) or $logger->fault("Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR");
+
             }
 
             my $edid =
