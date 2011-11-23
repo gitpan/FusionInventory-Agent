@@ -11,7 +11,7 @@ use File::Path;
 use XML::Simple;
 use Sys::Hostname;
 
-our $VERSION = '2.1.10';
+our $VERSION = '2.1.12';
 $ENV{LC_ALL} = 'C'; # Turn off localised output for commands
 $ENV{LANG} = 'C'; # Turn off localised output for commands
 
@@ -99,6 +99,11 @@ sub new {
         eval '
 use Encode;
 use Win32::API;
+
+# Kernel32.dll is used more or less everywhere.
+# Without this, Win32::API will release the DLL even
+# if it s a very bad idea
+*Win32::API::DESTROY = sub {};
 
 	my $GetComputerName = new Win32::API("kernel32", "GetComputerNameExW", ["I", "P", "P"],
 "N");

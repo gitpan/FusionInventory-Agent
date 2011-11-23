@@ -249,8 +249,7 @@ Makefile.PL
 MANIFEST			This list of files
 memconf
 META.yml
-README
-README.html
+MYMETA.yml
 resources/bsd/ifconfig/dragonfly-1
 resources/bsd/lsvfs/freebsd-8.1
 resources/bsd/mount/dragonfly-1

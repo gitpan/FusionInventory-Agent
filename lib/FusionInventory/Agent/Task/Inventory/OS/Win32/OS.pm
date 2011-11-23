@@ -6,7 +6,12 @@ use warnings;
 use constant wbemFlagReturnImmediately => 0x10;
 use constant wbemFlagForwardOnly => 0x20;
 
-use Encode qw(encode);
+use Win32::API;
+# Kernel32.dll is used more or less everywhere.
+# Without this, Win32::API will release the DLL even
+# if it's a very bad idea
+*Win32::API::DESTROY = sub {};
+use Encode qw(encode decode);
 use English qw(-no_match_vars);
 use Win32::OLE::Variant;
 use Win32::TieRegistry (
@@ -131,25 +136,42 @@ sub doInventory {
         });
     }
 
+
+
+    my $GetComputerName = new Win32::API("kernel32", "GetComputerNameExW", ["I", "P", "P"],
+            "N");
+    my $lpBuffer = "\x00" x 1024;
+    my $N=1024;#pack ("c4", 160,0,0,0);
+
+    my $return = $GetComputerName->Call(3, $lpBuffer,$N);
+
+# GetComputerNameExW returns the string in UTF16, we have to change it
+# to UTF8
+    my $name = encode("UTF-8", substr(decode("UCS-2le", $lpBuffer),0,ord $N));
+    my $domain;
+    if ($name =~ s/^([^\.]+)\.(.+)/$1/) {
+        $domain = $2;
+    }
+
     foreach my $Properties (getWmiProperties('Win32_ComputerSystem', qw/
         Name Domain Workgroup UserName PrimaryOwnerName TotalPhysicalMemory
     /)) {
 
-        my $workgroup = $Properties->{Domain} || $Properties->{Workgroup};
-        my $userdomain;
-#        my $userid;
-#        my @tmp = split(/\\/, $Properties->{UserName});
-#        $userdomain = $tmp[0];
-#        $userid = $tmp[1];
+        my $workgroup = $Properties->{Domain};
+        $workgroup = $Properties->{Workgroup} unless $workgroup;
+        $workgroup = $domain unless $workgroup;
+
         my $winowner = $Properties->{PrimaryOwnerName};
 
         #$inventory->addUser({ LOGIN => encode('UTF-8', $Properties->{UserName}) });
+        $name = $Properties->{Name} unless $name;
+        $name = $ENV{COMPUTERNAME} unless $name;
+
         $inventory->setHardware({
             MEMORY => int(($Properties->{TotalPhysicalMemory}||0)/(1024*1024)),
-            USERDOMAIN => $userdomain,
             WORKGROUP => $workgroup,
             WINOWNER => $winowner,
-            NAME => $Properties->{Name},
+            NAME => $name,
         });
     }
 

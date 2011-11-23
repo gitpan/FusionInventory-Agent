@@ -1,5 +1,6 @@
 ---
 abstract: 'FusionInventory unified Agent for UNIX, Linux, Windows and MacOSX'
+author: []
 build_requires:
   ExtUtils::MakeMaker: 6.57
   HTTP::Server::Simple::Authen: 0
@@ -8,10 +9,10 @@ build_requires:
   Test::More: 0
   XML::TreePP: 0
 configure_requires:
-  ExtUtils::MakeMaker: 6.57
+  ExtUtils::MakeMaker: 0
 distribution_type: module
-dynamic_config: 1
-generated_by: 'Module::Install version 1.04'
+dynamic_config: 0
+generated_by: 'ExtUtils::MakeMaker version 6.57_05'
 license: gpl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -19,24 +20,13 @@ meta-spec:
 name: FusionInventory-Agent
 no_index:
   directory:
-    - inc
-    - share
     - t
-recommends:
-  Compress::Zlib: 0
-  Crypt::SSLeay: 0
-  File::ShareDir: 0
-  HTTP::Daemon: 0
-  Net::CUPS: 0.6
-  Proc::Daemon: 0
-  Proc::PID::File: 0
+    - inc
 requires:
   Digest::MD5: 0
   LWP: 0
   Net::IP: 0
   UNIVERSAL::require: 0
   XML::Simple: 0
-  perl: 5.8.0
-resources:
-  license: http://opensource.org/licenses/gpl-license.php
+  perl: 5.008
 version: 2.1.12
