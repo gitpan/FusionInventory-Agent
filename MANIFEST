@@ -365,7 +365,7 @@ t/inventory/linux/lvm.t
 t/inventory/macos/video.t
 t/README.t
 t/rhn-systemid.t
-t/ssl.t
+t/ssl.t.disabled
 t/ssl/cnf/alternate.cnf
 t/ssl/cnf/bad.cnf
 t/ssl/cnf/ca.cnf
