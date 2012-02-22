@@ -350,6 +350,7 @@ share/html/index.tpl
 share/html/logo.png
 share/html/site.css
 share/pci.ids
+SIGNATURE
 t/app.t
 t/compile.t
 t/critic.t
