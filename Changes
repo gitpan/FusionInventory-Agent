@@ -1,4 +1,67 @@
-Revision history for FusionInventory::Agent
+Revision history for FusionInventory agent
+
+2.2.0  Sat, 07 Apr 2012 18:57:49 +0200
+
+Major changes:
+* large speed improvement: up to 150% for a local inventory
+* better multitasking support:
+ - the agent use fork() to run task if needed, instead of running a new process
+   from scratch, avoiding the need to use a temporary file to transmit
+   parameters, with related security risks
+ - the agent only forks to run a tasks when running as a server, making tracing
+   and debugging easier
+ - the agent only use one thread for the web interface
+* better SSL support:
+  - IO::Socket::SSL perl module is now required for certificate validation
+  - Crypt::SSLeay perl module still allow HTTPS support, but without
+    certificate validation, and the connection will be aborted unless
+    certificate checking is disabled
+  - validation is now performed by SSL library, and honours alternative subject
+    names, and other subtilities
+* large cleanup of values returned from inventory:
+  - unknown values are filtered out
+  - strings are trimmed for trailing spaces
+  - irrelevant values, such as windows internal USB serial number, or
+    controllers type and manufacturer on AIX and HPUX, are filtered out
+* installation procedure automatically setup configuration and data directories
+  locations in executable, there is no need to manually configure them anymore
+* removal of useless features:
+  - support for OCS account info have been dropped, the agent doesn't store
+    arbitrary informations locally anymore
+  - support for OCS network discovery and software deployment features within
+    inventory task have been removed, we have better alternatives
+  - useless Ping task has been dropped
+* cleanup of available options:
+  - deprecated --nosoft and --nosoftware options have been removed
+  - --devlib, --share-dir, --basevardir and --realm options have been
+    deprecated, as their values are now computed automatically at installation
+  - --daemon-no-fork option has been deprecated, and replaced by --daemon
+    --no-fork options
+  - --info option has been deprecated, as it had no effect
+  - --rpc-trust-localhost option has been deprecated, in favor of a more
+    generic --http-trust option, allowing an arbitrary IP adresse or range
+  - --debug option can be specified multiple times, for additional verbosity
+  - --no-inventory, --no-ocsdeploy, --no-snmpquery, --no-netdiscovery options
+    have been deprecated in favor of a generic --no-task option
+  - --no-software, --no-printer options have been deprecated in favor of a
+    generic --no-category option, and 'environment' value support has been added
+* new --config option allows to select configuration backend, allowing to use
+  file configuration if needed under windows, or to ignore any external
+  configuration
+* fusioninventory-agent-config executable has been dropped, in favor of better
+  documentation
+* documentation has been reviewed for consistency in various places where it
+  appears (--help output, man page, configuration file)
+* XML::TreePP perl module is now used instead of XML::Simple, reducing native
+  perl modules dependencies
+* OcsDeploy task is now deprecated. Please continue to use the 2.1.x agent is
+  you need it.
+
+Minor changes:
+* Add the HARDWARE/CHASSIS_TYPE information
+* Linux: report all IP addresses used by each interfaces (#854)
+* HPUX: don't report unoccupied memory slots
+* AIX: add LVM support
 
 2.1.14  Wed, 22 Feb 2012 14:56:51 -0000
 

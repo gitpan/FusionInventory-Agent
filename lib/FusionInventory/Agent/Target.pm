@@ -4,306 +4,224 @@ use strict;
 use warnings;
 
 use English qw(-no_match_vars);
-use File::Path;
-use Config;
 
-BEGIN {
-    # threads and threads::shared must be loaded before
-    # $lock is initialized
-    if ($Config{usethreads}) {
-        eval {
-            require threads;
-            require threads::shared;
-        };
-        if ($EVAL_ERROR) {
-            print "[error]Failed to use threads!\n"; 
-        }
-    }
-}
-
-# resetNextRunDate() can also be called from another thread (RPC)
-my $lock : shared;
+use FusionInventory::Agent::Logger;
+use FusionInventory::Agent::Storage;
 
 sub new {
-    my ($class, $params) = @_;
+    my ($class, %params) = @_;
 
-    my $self = {};
+    die 'no basevardir parameter' unless $params{basevardir};
 
-    lock($lock);
-
-    my $nextRunDate : shared;
-    $self->{nextRunDate} = \$nextRunDate;
-
-    $self->{config} = $params->{config};
-    $self->{logger} = $params->{logger};
-    $self->{type} = $params->{type};
-    $self->{path} = $params->{path} || '';
-    $self->{deviceid} = $params->{deviceid};
-
-
-    my $config = $self->{config};
-    my $logger = $self->{logger};
-    my $target = $self->{target};
-    my $type   = $self->{type};
-
-
-    $self->{format} = ($type eq 'local' && $config->{html})?'HTML':'XML';
-
+    my $self = {
+        logger       => $params{logger} ||
+                        FusionInventory::Agent::Logger->new(),
+        maxDelay     => $params{maxDelay} || 3600,
+        initialDelay => $params{delaytime},
+    };
     bless $self, $class;
-   
-    $self->{debugPrintTimer} = 0;
-    
-    $self->init();
-
-    if ($params->{type} !~ /^(server|local|stdout)$/ ) {
-        $logger->fault('bad type'); 
-    }
-
-    if (!-d $self->{vardir}) {
-        $logger->fault("Bad vardir setting!");
-    }
-
-    $self->{storage} = FusionInventory::Agent::Storage->new({
-        target => $self
-    });
-    my $storage = $self->{storage};
-    $self->{myData} = $storage->restore();
-
-
-    if ($self->{myData}{nextRunDate}) {
-        $logger->debug (
-            "[$self->{path}] Next server contact planned for ".
-            localtime($self->{myData}{nextRunDate})
-        );
-        ${$self->{nextRunDate}} = $self->{myData}{nextRunDate};
-    }
-
-    $self->{accountinfo} = FusionInventory::Agent::AccountInfo->new({
-            logger => $logger,
-            config => $config,
-            target => $self,
-        });
-
-    my $accountinfo = $self->{accountinfo};
-
-    if ($config->{tag}) {
-        if ($accountinfo->get("TAG")) {
-            $logger->debug(
-                "A TAG seems to already exist in the server for this ".
-                "machine. The -t paramter may be ignored by the server " .
-                "unless it has OCS_OPT_ACCEPT_TAG_UPDATE_FROM_CLIENT=1."
-            );
-        }
-        $accountinfo->set("TAG", $config->{tag});
-    }
-    $self->{currentDeviceid} = $self->{myData}{currentDeviceid};
 
     return $self;
 }
 
-sub isDirectoryWritable {
-    my ($self, $dir) = @_;
+sub _init {
+    my ($self, %params) = @_;
 
-    return -w $dir;
-}
-
-# TODO refactoring needed here.
-sub init {
-    my ($self) = @_;
-
-    my $config = $self->{config};
     my $logger = $self->{logger};
 
-    lock($lock);
-# The agent can contact different servers. Each server has it's own
-# directory to store data
-    if (
-        ((!-d $config->{basevardir} && !mkpath ($config->{basevardir})) ||
-            !$self->isDirectoryWritable($config->{basevardir}))
-        && $OSNAME ne 'MSWin32'
-    ) {
+    # target identity
+    $self->{id} = $params{id};
 
-        if (! -d $ENV{HOME}."/.ocsinventory/var") {
-            $logger->info(
-                "Failed to create basevardir: $config->{basevardir} " .
-                "directory: $ERRNO. I'm going to use the home directory " .
-                "instead (~/.ocsinventory/var)."
-            );
-        }
+    $self->{storage} = FusionInventory::Agent::Storage->new(
+        logger    => $self->{logger},
+        directory => $params{vardir}
+    );
 
-        $config->{basevardir} = $ENV{HOME}."/.ocsinventory/var";
-        if (!-d $config->{basevardir} && !mkpath ($config->{basevardir})) {
-            $logger->error(
-                "Failed to create basedir: $config->{basedir} directory: " .
-                "$ERRNO. The HOSTID will not be written on the harddrive. " .
-                "You may have a duplicated entry of this computer in your OCS " .
-                "database"
-            );
-        }
-        $logger->debug("var files are stored in ".$config->{basevardir});
-    }
+    # handle persistent state
+    $self->_loadState();
 
-    if ($self->{type} eq 'server') {
-        my $dir = $self->{path};
-        $dir =~ s/\//_/g;
-        # On Windows, we can't have ':' in directory path
-        $dir =~ s/:/../g if $OSNAME eq 'MSWin32';
-        $self->{vardir} = $config->{basevardir} . "/" . $dir;
-    } else {
-        $self->{vardir} = $config->{basevardir} . "/__LOCAL__";
-    }
-    $logger->debug("vardir: $self->{vardir}");
+    $self->{nextRunDate} = $self->_computeNextRunDate()
+        if !$self->{nextRunDate};
 
-    if (!-d $self->{vardir} && !mkpath ($self->{vardir})) {
-        $logger->error(
-            "Failed to create vardir: $self->{vardir} directory: $ERRNO"
-        );
-    }
+    $self->_saveState();
 
-    if (!$self->isDirectoryWritable($self->{vardir})) {
-        $logger->fault("Can't write in $self->{vardir}");
-    }
+    $logger->debug(
+        "[target $self->{id}] Next server contact planned for " .
+        localtime($self->{nextRunDate})
+    );
 
-    $self->{accountinfofile} = $self->{vardir} . "/ocsinv.adm";
-    $self->{last_statefile} = $self->{vardir} . "/last_state";
+}
+
+sub setShared {
+    my ($self) = @_;
+
+    # make sure relevant attributes are shared between threads
+    threads::shared->require();
+    # calling share(\$self->{status}) directly breaks in testing
+    # context, hence the need to use an intermediate variable
+    my $nextRunDate = \$self->{nextRunDate};
+    threads::shared::share($nextRunDate);
+
+    $self->{shared} = 1;
+}
+
+sub getStorage {
+    my ($self) = @_;
+
+    return $self->{storage};
 }
 
 sub setNextRunDate {
+    my ($self, $nextRunDate) = @_;
 
-    my ($self, $args) = @_;
-
-    my $config = $self->{config};
-    my $logger = $self->{logger};
-    my $storage = $self->{storage};
-
-    lock($lock);
-
-    my $serverdelay = $self->{myData}{prologFreq};
-
-    lock($lock);
-
-    my $max;
-    if ($serverdelay) {
-        $max = $serverdelay * 3600;
-    } else {
-        $max = $config->{delaytime};
-        # If the PROLOG_FREQ has never been initialized, we force it at 1h
-        $self->setPrologFreq(1);
-    }
-    $max = 1 unless $max;
-
-    my $time = time + ($max/2) + int rand($max/2);
-
-    $self->{myData}{nextRunDate} = $time;
-    
-    ${$self->{nextRunDate}} = $self->{myData}{nextRunDate};
-
-    $logger->debug (
-        "[$self->{path}] Next server contact has just been planned for ".
-        localtime($self->{myData}{nextRunDate})
-    );
-
-    $storage->save({ data => $self->{myData} });
-}
-
-sub getNextRunDate {
-    my ($self) = @_;
-
-    my $config = $self->{config};
-    my $logger = $self->{logger};
-
-    lock($lock);
-
-    if (${$self->{nextRunDate}}) {
-        if ($self->{debugPrintTimer} < time) {
-            $self->{debugPrintTimer} = time + 600;
-        }; 
-
-        return ${$self->{nextRunDate}};
-    }
-
-    $self->setNextRunDate();
-
-    if (!${$self->{nextRunDate}}) {
-        $logger->fault('nextRunDate not set!');
-    }
-
-    return $self->{myData}{nextRunDate} ;
-
+    lock($self->{nextRunDate}) if $self->{shared};
+    $self->{nextRunDate} = $nextRunDate;
+    $self->_saveState();
 }
 
 sub resetNextRunDate {
     my ($self) = @_;
 
-    my $logger = $self->{logger};
-    my $storage = $self->{storage};
-
-    lock($lock);
-    $logger->debug("Agent is now running");
-    
-    $self->{myData}{nextRunDate} = 1;
-    $storage->save({ data => $self->{myData} });
-    
-    ${$self->{nextRunDate}} = $self->{myData}{nextRunDate};
+    lock($self->{nextRunDate}) if $self->{shared};
+    $self->{nextRunDate} = $self->_computeNextRunDate();
+    $self->_saveState();
 }
 
-sub setPrologFreq {
+sub getNextRunDate {
+    my ($self) = @_;
 
-    my ($self, $prologFreq) = @_;
-
-    my $config = $self->{config};
-    my $logger = $self->{logger};
-    my $storage = $self->{storage};
-
-    return unless $prologFreq;
-
-    if ($self->{myData}{prologFreq} && ($self->{myData}{prologFreq}
-            eq $prologFreq)) {
-        return;
-    }
-    if (defined($self->{myData}{prologFreq})) {
-        $logger->info(
-            "PROLOG_FREQ has changed since last process ". 
-            "(old=$self->{myData}{prologFreq},new=$prologFreq)"
-        );
-    } else {
-        $logger->info("PROLOG_FREQ has been set: $prologFreq");
-    }
-
-    $self->{myData}{prologFreq} = $prologFreq;
-    $storage->save({ data => $self->{myData} });
-
+    return $self->{nextRunDate};
 }
 
-sub setCurrentDeviceID {
+sub getMaxDelay {
+    my ($self) = @_;
 
-    my ($self, $deviceid) = @_;
+    return $self->{maxDelay};
+}
 
-    my $config = $self->{config};
-    my $logger = $self->{logger};
-    my $storage = $self->{storage};
+sub setMaxDelay {
+    my ($self, $maxDelay) = @_;
 
-    return unless $deviceid;
+    $self->{maxDelay} = $maxDelay;
+    $self->_saveState();
+}
 
-    if ($self->{myData}{currentDeviceid} &&
-        ($self->{myData}{currentDeviceid} eq $deviceid)) {
-        return;
-    }
+sub getStatus {
+    my ($self) = @_;
 
-    if (!$self->{myData}{currentDeviceid}) {
-        $logger->debug("DEVICEID initialized at $deviceid");
+    return
+        $self->getDescription() .
+        ': '                    .
+         ($self->{nextRunDate} > 1 ? localtime($self->{nextRunDate}) : "now" );
+}
+
+# compute a run date, as current date and a random delay
+# between maxDelay / 2 and maxDelay
+sub _computeNextRunDate {
+    my ($self) = @_;
+
+    my $ret;
+    if ($self->{initialDelay}) {
+        $ret = time + $self->{initialDelay};
+        $self->{initialDelay} = undef;
     } else {
-        $logger->info(
-            "DEVICEID has changed since last process ". 
-            "(old=$self->{myData}{currentDeviceid},new=$deviceid"
-        );
+        $ret =
+            time                   +
+            $self->{maxDelay} / 2  +
+            int rand($self->{maxDelay} / 2);
     }
 
-    $self->{myData}{currentDeviceid} = $deviceid;
-    $storage->save({ data => $self->{myData} });
+    return $ret;
+}
 
-    $self->{currentDeviceid} = $deviceid;
+sub _loadState {
+    my ($self) = @_;
 
+    my $data = $self->{storage}->restore(name => 'target');
+
+    $self->{maxDelay}    = $data->{maxDelay}    if $data->{maxDelay};
+    $self->{nextRunDate} = $data->{nextRunDate} if $data->{nextRunDate};
+}
+
+sub _saveState {
+    my ($self) = @_;
+
+    $self->{storage}->save(
+        name => 'target',
+        data => {
+            maxDelay    => $self->{maxDelay},
+            nextRunDate => $self->{nextRunDate},
+        }
+    );
 }
 
 1;
+__END__
+
+=head1 NAME
+
+FusionInventory::Agent::Target - Abstract target
+
+=head1 DESCRIPTION
+
+This is an abstract class for execution targets.
+
+=head1 METHODS
+
+=head2 new(%params)
+
+The constructor. The following parameters are allowed, as keys of the %params
+hash:
+
+=over
+
+=item I<logger>
+
+the logger object to use
+
+=item I<maxDelay>
+
+the maximum delay before contacting the target, in seconds 
+(default: 3600)
+
+=item I<basevardir>
+
+the base directory of the storage area (mandatory)
+
+=back
+
+=head2 setShared()
+
+Ensure the target can be shared among threads
+
+=head2 getNextRunDate()
+
+Get nextRunDate attribute.
+
+=head2 setNextRunDate($nextRunDate)
+
+Set next execution date.
+
+=head2 resetNextRunDate()
+
+Set next execution date to a random value.
+
+=head2 getMaxDelay($maxDelay)
+
+Get maxDelay attribute.
+
+=head2 setMaxDelay($maxDelay)
+
+Set maxDelay attribute.
+
+=head2 getStorage()
+
+Return the storage object for this target.
+
+=head2 getDescription()
+
+Return a string description of the target.
+
+=head2 getStatus()
+
+Return a string status for the target.

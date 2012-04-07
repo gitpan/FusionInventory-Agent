@@ -3,126 +3,146 @@ package FusionInventory::Agent::Config;
 use strict;
 use warnings;
 
-use Getopt::Long;
-use File::Spec;
 use English qw(-no_match_vars);
-
-my $basedir = '';
-my $basevardir = '';
-
-if ($OSNAME eq 'MSWin32') {
-    $basedir = $ENV{APPDATA}.'/fusioninventory-agent';
-    $basevardir = $basedir.'/var/lib/fusioninventory-agent';
-} else {
-    $basevardir = File::Spec->rel2abs($basedir.'/var/lib/fusioninventory-agent'),
-}
+use File::Spec;
+use Getopt::Long;
+use UNIVERSAL::require;
 
 my $default = {
-    'ca-cert-dir'             => '',
-    'ca-cert-file'            => '',
-    'conf-file'               => '',
-    'color'                   => 0,
-    'daemon'                  => 0,
-    'daemon-no-fork'          => 0,
-    'debug'                   => 0,
-    'devlib'                  => 0,
-    'disable-perllib-envvar'  => 0,
-    'force'                   => 0,
-    'help'                    => 0,
-    'html'                    => 0,
-    'info'                    => 1,
-    'lazy'                    => 0,
-    'local'                   => '',
     'logger'                  => 'Stderr',
-    'logfile'                 => '',
-    'logfile-maxsize'         => 0,
     'logfacility'             => 'LOG_USER',
-    'password'                => '',
-    'proxy'                   => '',
-    'realm'                   => '',
-    'remotedir'               => '/ocsinventory', # deprecated
-    'server'                  => '',
-    'share-dir'               => '',
-    'stdout'                  => 0,
-    'tag'                     => '',
-    'user'                    => '',
-    'version'                 => 0,
-    'wait'                    => '',
-#   'xml'                     => 0,
-    'no-deploy'               => 0,
-    'no-esx'                  => 0,
-    'no-ocsdeploy'            => 0,
-    'no-inventory'            => 0,
-    'nosoft'                  => 0, # deprecated
-    'nosoftware'              => 0, # deprecated
-    'no-printer'              => 0,
-    'no-socket'               => 0,
-    'no-software'             => 0,
-    'no-software'             => 0,
-    'no-wakeonlan'            => 0,
-    'no-snmpquery'            => 0,
-    'no-netdiscovery'         => 0,
-    'no-p2p'                  => 0,
-    'delaytime'               => 3600, # max delay time (seconds)
-    'backend-collect-timeout' => 180,   # timeOut of process : see Backend.pm
-    'no-ssl-check'            => 0,
-    'scan-homedirs'           => 0,
-    'rpc-ip'                  => '',
-    'rpc-port'                => '62354',
-    'rpc-trust-localhost'     => 0,
-    # Other values that can't be changed with the
-    # CLI parameters
-    'basevardir'              => $basevardir,
-#    'logdir'                  =>  $basedir.'/var/log/fusioninventory-agent',
-#   'pidfile'                 =>  $basedir.'/var/run/ocsinventory-agent.pid',
+    'delaytime'               => 3600,
+    'backend-collect-timeout' => 30,
+    'httpd-port'              => 62354,
 };
 
-sub load {
-    my (undef, $params) = @_;
+my $deprecated = {
+    'info' => {
+        message => 'it was useless anyway'
+    },
+    'realm' => {
+        message => 'it is now useless'
+    },
+    'no-socket' => {
+        message => 'use --no-httpd option instead',
+        new     => 'no-httpd'
+    },
+    'rpc-ip' => {
+        message => 'use --httpd-ip option instead',
+        new     => 'httpd-ip'
+    },
+    'rpc-port' => {
+        message => 'use --httpd-port option instead',
+        new     => 'httpd-port'
+    },
+    'rpc-trust-localhost' => {
+        message => 'use --httpd-trust 127.0.0.1 option instead',
+        new     => { 'httpd-trust' => '127.0.0.1' }
+    },
+    'daemon-no-fork' => {
+        message => 'use --daemon and --no-fork options instead',
+        new     => [ 'daemon', 'no-fork' ]
+    },
+    'D' => {
+        message => 'use --daemon and --no-fork options instead',
+        new     => [ 'daemon', 'no-fork' ]
+    },
+    'no-inventory' => {
+        message => 'use --no-task inventory option instead',
+        new     => { 'no-task' => 'inventory' }
+    },
+    'no-wakeonlan' => {
+        message => 'use --no-task wakeonlan option instead',
+        new     => { 'no-task' => 'wakeonlan' }
+    },
+    'no-netdiscovery' => {
+        message => 'use --no-task netdiscovery option instead',
+        new     => { 'no-task' => 'netdiscovery' }
+    },
+    'no-snmpquery' => {
+        message => 'use --no-task snmpquery option instead',
+        new     => { 'no-task' => 'snmpquery' }
+    },
+    'no-ocsdeploy' => {
+        message => 'use --no-task ocsdeploy option instead',
+        new     => { 'no-task' => 'ocsdeploy' }
+    },
+    'no-printer' => {
+        message => 'use --no-category printer option instead',
+        new     => { 'no-category' => 'printer' }
+    },
+    'no-software' => {
+        message => 'use --no-category software option instead',
+        new     => { 'no-category' => 'software' }
+    },
+};
 
-    my $config = $default;
-    $config->{VERSION} = $FusionInventory::Agent::VERSION;
+sub new {
+    my ($class, %params) = @_;
 
-    if ($OSNAME eq 'MSWin32') {
-        loadFromWinRegistry($config);
-    } else {
-        loadFromCfgFile($config);
-    }
-    loadUserParams($config);
+    my $self = {};
+    bless $self, $class;
+    $self->_loadDefaults();
 
-    if (!$config->{'share-dir'}) {
-        if ($config->{'devlib'}) {
-                $config->{'share-dir'} = File::Spec->rel2abs('./share/');
-        } else {
-            eval { 
-                require File::ShareDir;
-                $config->{'share-dir'} = File::ShareDir::dist_dir('FusionInventory-Agent');
-            };
+    my $backend =
+        $params{options}->{'conf-file'} ? 'file'                     :
+        $params{options}->{config}      ? $params{options}->{config} :
+        $OSNAME eq 'MSWin32'            ? 'registry'                 :
+                                          'file';
+
+    SWITCH: {
+        if ($backend eq 'registry') {
+            die "Unavailable configuration backend\n"
+                unless $OSNAME eq 'MSWin32';
+            $self->_loadFromRegistry();
+            last SWITCH;
         }
+
+        if ($backend eq 'file') {
+            $self->_loadFromFile({
+                file      => $params{options}->{'conf-file'},
+                directory => $params{confdir},
+            });
+            last SWITCH;
+        }
+
+        if ($backend eq 'none') {
+            last SWITCH;
+        }
+
+        die "Unknown configuration backend '$backend'\n";
     }
 
+    $self->_loadUserParams($params{options});
 
-    return $config;
+    $self->_checkContent();
+
+    return $self;
 }
 
-sub loadFromWinRegistry {
-    my $config = shift;
+sub _loadDefaults {
+    my ($self) = @_;
 
-    eval {
-        require Encode;
-        Encode->import('encode');
-        require Win32::TieRegistry;
-        Win32::TieRegistry->import(
-            Delimiter   => "/",
-            ArrayValues => 0
-        );
-    };
-    if ($EVAL_ERROR) {
-        print "[error] $EVAL_ERROR";
-        return;
+    foreach my $key (keys %$default) {
+        $self->{$key} = $default->{$key};
     }
+}
 
-    my $machKey = $Win32::TieRegistry::Registry->Open( "LMachine", {Access=>Win32::TieRegistry::KEY_READ(),Delimiter=>"/"} );
+sub _loadFromRegistry {
+    my ($self) = @_;
+
+    my $Registry;
+    Win32::TieRegistry->require();
+    Win32::TieRegistry->import(
+        Delimiter   => '/',
+        ArrayValues => 0,
+        TiedRef     => \$Registry
+    );
+
+    my $machKey = $Registry->Open('LMachine', {
+        Access => Win32::TieRegistry::KEY_READ()
+    }) or die "Can't open HKEY_LOCAL_MACHINE key: $EXTENDED_OS_ERROR";
+
     my $settings = $machKey->{"SOFTWARE/FusionInventory-Agent"};
 
     foreach my $rawKey (keys %$settings) {
@@ -133,223 +153,134 @@ sub loadFromWinRegistry {
         $val =~ s/\s+$//;
         $val =~ s/^'(.*)'$/$1/;
         $val =~ s/^"(.*)"$/$1/;
-        $config->{lc($key)} = $val;
+        $self->{lc($key)} = $val;
     }
 }
 
-sub loadFromCfgFile {
-    my $config = shift;
+sub _loadFromFile {
+    my ($self, $params) = @_;
 
-    $config->{etcdir} = [];
+    my $file = $params->{file} ?
+        $params->{file} : $params->{directory} . '/agent.cfg';
 
-    my $file;
-
-    my $in;
-    foreach (@ARGV) {
-        if (!$in && /^--conf-file=(.*)/) {
-            $file = $1;
-            $file =~ s/'(.*)'/$1/;
-            $file =~ s/"(.*)"/$1/;
-        } elsif (/^--conf-file$/) {
-            $in = 1;
-        } elsif ($in) {
-            $file = $_;
-            $in = 0;
-        } else {
-            $in = 0;
-        }
-    }
-
-    push (@{$config->{etcdir}}, '/etc/fusioninventory');
-    push (@{$config->{etcdir}}, '/usr/local/etc/fusioninventory');
-#  push (@{$config->{etcdir}}, $ENV{HOME}.'/.ocsinventory'); # Should I?
-
-    if (!$file || !-f $file) {
-        foreach (@{$config->{etcdir}}) {
-            $file = $_.'/agent.cfg';
-            last if -f $file;
-        }
-        return $config unless -f $file;
+    if ($file) {
+        die "non-existing file $file" unless -f $file;
+        die "non-readable file $file" unless -r $file;
+    } else {
+        die "no configuration file";
     }
 
     my $handle;
     if (!open $handle, '<', $file) {
         warn "Config: Failed to open $file: $ERRNO";
-        return $config;
+        return;
     }
 
-    $config->{'conf-file'} = $file;
-
-    while (<$handle>) {
-        s/#.+//;
-        if (/([\w-]+)\s*=\s*(.+)/) {
+    while (my $line = <$handle>) {
+        $line =~ s/#.+//;
+        if ($line =~ /([\w-]+)\s*=\s*(.+)/) {
             my $key = $1;
             my $val = $2;
             # Remove the quotes
             $val =~ s/\s+$//;
             $val =~ s/^'(.*)'$/$1/;
             $val =~ s/^"(.*)"$/$1/;
-            $config->{$key} = $val;
+            $self->{$key} = $val;
         }
     }
     close $handle;
 }
 
-sub loadUserParams {
-    my $config = shift;
+sub _loadUserParams {
+    my ($self, $params) = @_;
 
-    Getopt::Long::Configure( "no_ignorecase" );
-
-    GetOptions(
-        $config,
-        'backend-collect-timeout=s',
-        'basevardir=s',
-        'ca-cert-dir=s',
-        'ca-cert-file=s',
-        'conf-file=s',
-        'color',
-        'daemon|d',
-        'daemon-no-fork|D',
-        'debug',
-        'delaytime=s',
-        'devlib',
-        'disable-perllib-envvar',
-        'force|f',
-        'help|h',
-        'html',
-        'info|i',
-        'lazy',
-        'local|l=s',
-        'logger=s',
-        'logfile=s',
-        'logfile-maxsize=i',
-        'nosoft',
-        'nosoftware',
-        'no-deploy',
-        'no-esx',
-        'no-ocsdeploy',
-        'no-inventory',
-        'no-printer',
-        'no-socket',
-        'no-soft',
-        'no-software',
-        'no-ssl-check',
-        'no-wakeonlan',
-        'no-snmpquery',
-        'no-netdiscovery',
-        'no-p2p',
-        'password|p=s',
-        'proxy|P=s',
-        'realm|r=s',
-        'rpc-ip=s',
-        'rpc-port=s',
-        'rpc-trust-localhost:s' => sub {$config->{'rpc-trust-localhost'} = $_[1] eq 0?0:1},
-        'remotedir|R=s',
-        'scan-homedirs:s' => sub {$config->{'scan-homedirs'} = $_[1] eq 0?0:1},
-        'share-dir=s',
-        'server|s=s',
-        'stdout',
-        'tag|t=s',
-        'user|u=s',
-        'version',
-        'wait|w=s',
-    ) or help($config);
-
-    # We want only canonical path
-    $config->{basevardir} = File::Spec->rel2abs($config->{basevardir}) if $config->{basevardir};
-    $config->{'share-dir'} = File::Spec->rel2abs($config->{'share-dir'}) if $config->{'share-dir'};
-    $config->{'conf-file'} = File::Spec->rel2abs($config->{'conf-file'}) if $config->{'conf-file'};
-    $config->{'ca-cert-file'} = File::Spec->rel2abs($config->{'ca-cert-file'}) if $config->{'ca-cert-file'};
-    $config->{'ca-cert-dir'} = File::Spec->rel2abs($config->{'ca-cert-dir'}) if $config->{'ca-cert-dir'};
-    $config->{'logfile'} = File::Spec->rel2abs($config->{'logfile'}) if $config->{'logfile'};
-
-
-    help($config) if $config->{help};
-    version() if $config->{version};
+    foreach my $key (keys %$params) {
+        $self->{$key} = $params->{$key};
+    }
 }
 
-sub help {
-    my ($config, $error) = @_;
-    if ($error) {
-        chomp $error;
-        print "ERROR: $error\n\n";
+sub _checkContent {
+    my ($self) = @_;
+
+    # check for deprecated options
+    foreach my $old (keys %$deprecated) {
+        next unless defined $self->{$old};
+
+        my $handler = $deprecated->{$old};
+
+        # notify user of deprecation
+        print STDERR "the '$old' option is deprecated, $handler->{message}\n";
+
+        # transfer the value to the new option, if possible
+        if ($handler->{new}) {
+            if (ref $handler->{new} eq 'HASH') {
+                # list of new options with new values
+                foreach my $key (keys %{$handler->{new}}) {
+                    $self->{$key} = $self->{$key} ?
+                        $self->{$key} . ',' . $handler->{new}->{$key} :
+                        $handler->{new}->{$key};
+                }
+            } elsif (ref $handler->{new} eq 'ARRAY') {
+                # list of new options, with same value
+                foreach my $new (@{$handler->{new}}) {
+                    $self->{$new} = $self->{$old};
+                }
+            } else {
+                # new option, with same value
+                $self->{$handler->{new}} = $self->{$old};
+            }
+        }
+
+        # avoid cluttering configuration
+        delete $self->{$old};
     }
 
-    if ($config->{'conf-file'}) {
-        print STDERR "Setting initialised with values retrieved from ".
-        "the config found at ".$config->{'conf-file'}."\n";
+    # a logfile options implies a file logger backend
+    if ($self->{logfile}) {
+        $self->{logger} .= ',File';
     }
 
-    print STDERR <<EOF;
+    # multi-values options
+    $self->{logger} = [ split(/,/, $self->{logger}) ] if $self->{logger};
+    $self->{server} = [ split(/,/, $self->{server}) ] if $self->{server};
+    $self->{'no-task'} = [ split(/,/, $self->{'no-task'}) ]
+        if $self->{'no-task'};
+    $self->{'no-category'} = [ split(/,/, $self->{'no-category'}) ]
+        if $self->{'no-category'};
 
-Common options:
-    --debug             debug mode ($config->{debug})
-    --html              save the inventory requested by --local in HTML ($config->{html})
-    -l --local=DIR      do not contact server but write inventory in XML to DIR directory ($config->{local})
-    --logfile=FILE      log message in FILE ($config->{logfile})
-    --version           print the version
-
-
-Network options:
-    -p --password=PWD   password for server authentication
-    -P --proxy=PROXY    proxy address. e.g: http://user:pass\@proxy:port ($config->{proxy})
-    -r --realm=REALM    realm for server HTTP authentication. e.g: 'Restricted Area' ($config->{realm})
-    -s --server=uri     server uri, e.g: http://server/ocsinventory ($config->{server})
-    -u --user           user name to use for server authentication
-
-SSL options:
-    --ca-cert-dir=D     SSL certificate directory ($config->{'ca-cert-dir'})
-    --ca-cert-file=F    SSL certificate file ($config->{'ca-cert-file'})
-
-Disable options:
-    --no-deploy         do not deploy packages or run command with the new deploy task ($config->{'no-deploy'})
-    --no-esx            do not use the ESX inventory module ($config->{'no-esx'})
-    --no-ocsdeploy      do not deploy packages or run command ($config->{'no-ocsdeploy'})
-    --no-inventory      do not generate inventory ($config->{'no-inventory'})
-    --no-printer        do not return printer list in inventory $config->{'no-printer'})
-    --no-socket         do not allow remote connection ($config->{'no-socket'})
-    --no-software       do not return software list in inventory ($config->{'no-software'})
-    --no-ssl-check      do not check the SSL connection with the server ($config->{'no-ssl-check'})
-    --no-wakeonlan      do not use wakeonlan function ($config->{'no-wakeonlan'})
-    --no-snmpquery      do not use snmpquery function ($config->{'no-snmpquery'})
-    --no-netdiscovery   do not use netdiscovery function ($config->{'no-netdiscovery'})
-    --no-p2p            do not use P2P feature for OCS software deployment ($config->{'no-p2p'})
-
-Extra options:
-    --backend-collect-timeout   set a maximum delay time of one inventory data collect job ($config->{'backend-collect-timeout'})
-    --basevardir=/path          indicate the directory where the agent should store its files ($config->{basevardir})
-    --color                     use color in the console ($config->{color})
-    -d --daemon                 detach the agent in background ($config->{daemon})
-    -D --daemon-no-fork         put the agent in daemon mode but don't fork in background ($config->{'daemon-no-fork'})
-    --delaytime                 set a maximum delay time (in second) if no PROLOG_FREQ is set ($config->{delaytime})
-    --devlib                    search for Backend modules in ./lib only ($config->{devlib})
-    --disable-perllib-envvar    do not load Perl lib from PERL5LIB and PERLIB environment variable ($config->{'disable-perllib-envvar'})
-    -f --force                  always send data to server (Don't ask before) ($config->{force})
-    -i --info                   verbose mode ($config->{info})
-    --lazy                      do not contact the server more than one time during the PROLOG_FREQ ($config->{lazy})
-    --logfile-maxsize=X         maximum size of the log file in MB ($config->{'logfile-maxsize'})
-    --logger                    Logger you want to use, can be Stderr,File or Syslog ($config->{logger})
-    --rpc-ip=IP                 ip of the interface to use for peer to peer exchange ($config->{'rpc-ip'})
-    --rpc-port=PORT     port use for RPC
-    --rpc-trust-localhost=X     allow local users to force an inventory from http://127.0.0.1:62354/now (0/1) ($config->{'rpc-trust-localhost'})
-    --scan-homedirs=X           permit to scan home user directories (0/1) ($config->{'scan-homedirs'})
-    --share-dir=DIR             path to the directory where the shared files are stored ($config->{'share-dir'})
-    --stdout                    do not write or post the inventory but print it on STDOUT
-    -t --tag=TAG                use TAG as tag ($config->{tag}) Will be ignored by server if a value already exists.
-    -w --wait=DURATION          wait a random period between 0 and DURATION seconds before contacting server ($config->{wait})
-
-Manpage:
-    See man fusioninventory-agent
-
-FusionInventory-Agent is released under GNU GPL 2 license
-EOF
-
-    exit 1;
-}
-
-sub version {
-    print "FusionInventory Agent (".$FusionInventory::Agent::VERSION.")\n";
-    exit 0;
+    # files location
+    $self->{'ca-cert-file'} =
+        File::Spec->rel2abs($self->{'ca-cert-file'}) if $self->{'ca-cert-file'};
+    $self->{'ca-cert-dir'} =
+        File::Spec->rel2abs($self->{'ca-cert-dir'}) if $self->{'ca-cert-dir'};
+    $self->{'logfile'} =
+        File::Spec->rel2abs($self->{'logfile'}) if $self->{'logfile'};
 }
 
 1;
+__END__
+
+=head1 NAME
+
+FusionInventory::Agent::Config - Agent configuration
+
+=head1 DESCRIPTION
+
+This is the object used by the agent to store its configuration.
+
+=head1 METHODS
+
+=head2 new(%params)
+
+The constructor. The following parameters are allowed, as keys of the %params
+hash:
+
+=over
+
+=item I<confdir>
+
+the configuration directory.
+
+=item I<options>
+
+additional options override.

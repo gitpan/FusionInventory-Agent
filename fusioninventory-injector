@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 ###############################################################################
 ##Copyleft Pascal DANEK 2005
 ##Copyleft Goneri Le Bouder 2006
@@ -10,66 +10,52 @@
 ##Please refer to the General Public Licence http://www.gnu.org/ or Licence.txt
 ################################################################################
 
-if ($ENV{REALLIB}) {
-    @INC = split(/:/,$ENV{REALLIB});
-}
+use strict;
+use warnings;
 
-eval "
-use LWP::UserAgent;
-use XML::Simple;
 use Compress::Zlib;
+use English qw(-no_match_vars);
+use Fcntl qw/:flock/;
 use Getopt::Long;
-use strict;";
-my $help;
-my $directory;
-my $file;
-my $url;
-my $useragent;
-my $remove;
-my $verbose;
-my $stdin;
+use LWP::UserAgent;
+use Pod::Usage;
+
+my %options = (
+    useragent => 'FusionInventory-Injector'
+);
 
 sub loadfile {
-    $file = shift;
+    my $file = shift;
 
-    unless ( -r $file ) {
-        print STDERR "Can't read $file\n";
-        return;
-    }
-    print "Loading $file..." if $verbose;
+    die "can't read file $file" unless -r $file;
 
-    unless ( open( FILE, "$file" )) {
-        print STDERR "Failed to access $file : $!";
-        return;
-    }
+    print "Loading $file..." if $options{verbose};
 
-    local $/;
-    my $content = <FILE>;
-    close FILE or die "Can't close file $file: $!";
-    
+    open (my $fh, '<', $file) or die "can't open file $file: $ERRNO";
+    ## no critic (ProhibitBitwise)
+    flock ($fh, LOCK_EX | LOCK_NB) or die "can't lock file $file: $ERRNO";
+    local $RS;
+    my $content = <$fh>;
+    close $fh or die "Can't close file $file: $ERRNO";
+
     sendContent($content);
-
 }
 
 sub loaddirectory {
     my $directory = shift;
 
-    unless ( -r $directory ) {
-        print STDERR "Can't read $directory: $!\n";
-        return;
-    }
+    die "can't read directory $directory" unless -r $directory;
 
-    opendir( DIR, $directory ) || die "can't opendir $directory: $!";
-    foreach ( readdir(DIR) ) {
+    opendir (my $dh, $directory) or die "can't open directory $directory: $ERRNO";
+    foreach ( readdir($dh) ) {
         loadfile("$directory/$_") if (/\.ocs$/);
-	}
-	closedir DIR;
-
+    }
+    closedir $dh;
 }
 
 sub loadstdin {
     my $content;
-    undef $/;
+    undef $RS;
     $content = <STDIN>;
     sendContent($content);
 }
@@ -78,8 +64,8 @@ sub sendContent {
     my $content = shift;
 
     my $ua = LWP::UserAgent->new;
-    $ua->agent($useragent);
-    my $request = HTTP::Request->new( POST => $url );
+    $ua->agent($options{useragent});
+    my $request = HTTP::Request->new( POST => $options{url} );
     $request->header(
         'Pragma' => 'no-cache',
         'Content-type', 'Application/x-compress'
@@ -90,71 +76,46 @@ sub sendContent {
     $request->content(compress($content));
     my $res = $ua->request($request);
 
-    if($res->is_success){
-      print "OK\n" if $verbose;
-      print STDERR "Can't remove $file: $!\n"
-	      if ($remove && (!unlink $file));
-    }else{
-    	if($verbose){
-	 		 print "ERROR: ";
-	 		 print $res->status_line(), "\n";
-			}
+    if ($res->is_success()) {
+        print "OK\n" if $options{verbose};
+        print STDERR "Can't remove $options{file}: $ERRNO\n"
+            if ($options{remove} && (!unlink $options{file}));
+    } else {
+        if ($options{verbose}) {
+            print "ERROR: ";
+            print $res->status_line(), "\n";
+        }
     }
 }
 
-sub usage {
-
-    print STDERR <<EOF;
-DESCRIPTION:
-  A command line tools to import .ocs file in an OCS Inventry server.
-
-  USAGE:
-  -h --help	: this menu
-  -d --directory: load every .ocs files from a directory
-  -f --file	: load a speficic file
-  -u --url	: ocsinventory backend URL
-  -r --remove	: remove succesfuly injected files
-  -v --verbose	: verbose mode
-  --stdin       : read data from STDIN
-
-You must specify a --file or a --directory or STDIN.
-
-Example :
- \$export https_proxy=http://www-proxy:8080
- \$fusioninventory-injector -v -f /tmp/toto-2010-09-10-11-42-22.ocs --url https://login:pw\@yourserver/ocsinventory
-
-This tool is part of the FusionInventory distribution.
-EOF
-    exit 1;
-}
-
 GetOptions(
-    'h|help'		=> \$help,
-    'd|directory=s'	=> \$directory,
-    'f|file=s'		=> \$file,
-    'u|url=s'		=> \$url,
-    'useragent=s'	=> \$useragent,
-    'r|remove'		=> \$remove,
-    'v|verbose'		=> \$verbose,
-    'stdin'		=> \$stdin,
+    \%options,
+    'help|h',
+    'directory|d=s',
+    'file|f=s',
+    'url|u=s',
+    'useragent=s',
+    'remove|r',
+    'verbose|v',
+    'stdin',
 );
 
-# Default values
-$useragent	= 'FusionInventory-Injector' unless $useragent;
-###
+$OUTPUT_AUTOFLUSH = 1;
+pod2usage() if $options{help};
 
-$|=1;
-usage() if $help;
-if ($file && -f $file) {
-    loadfile($file);
-} elsif ($stdin) {
+if ($options{file}) {
+    die "file $options{file} does not exist" unless -f $options{file};
+    loadfile($options{file});
+} elsif ($options{stdin}) {
     loadstdin();
-} elsif ($directory) {
-   die("Directory does not exist. Abort.") unless -d $directory;
-   loaddirectory($directory);
+} elsif ($options{directory}) {
+    die "directory $options{directory} does not exist" unless -d $options{directory};
+   loaddirectory($options{directory});
 } else {
-    usage();
+    pod2usage();
 }
+
+exit(0);
 
 __END__
 
@@ -162,13 +123,23 @@ __END__
 
 fusioninventory-injector - A tool to push inventory in an OCS Inventory or compatible server.
 
-=head1 DESCRIPTION
-
-This tool can be used to test your server, do benchmark or push inventory from off-line machine.
-
 =head1 SYNOPSIS
 
-Please see: 
+fusioninventory-injector [options] [--file <file>|--directory <directory|--stdin]
 
-B<fusioninventory-injector> S<--help>
+  Options:
+    -h --help      this menu
+    -d --directory load every .ocs files from a directory
+    -f --file      load a speficic file
+    -u --url       server URL
+    -r --remove    remove succesfuly injected files
+    -v --verbose   verbose mode
+    --stdin        read data from STDIN
 
+  Examples:
+    fusioninventory-injector -v -f /tmp/toto-2010-09-10-11-42-22.ocs --url https://login:pw@server/ocsinventory
+
+=head1 DESCRIPTION
+
+This tool can be used to test your server, do benchmark or push inventory from
+off-line machine.

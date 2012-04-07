@@ -4,48 +4,42 @@ use strict;
 use warnings;
 use base 'FusionInventory::Agent::XML::Query';
 
-use XML::Simple;
-use Data::Dumper;
-use Digest::MD5 qw(md5_base64);
-
-#use FusionInventory::Agent::XML::Query::Prolog;
-
 sub new {
-    my ($class, $params) = @_;
+    my ($class, %params) = @_;
 
-    my $self = $class->SUPER::new($params);
+    die "no token parameter" unless $params{token};
 
-    my $logger = $self->{logger};
-    my $target = $self->{target};
-    my $rpc = $params->{rpc};
-
-    $self->{h}{QUERY} = ['PROLOG'];
-
-    # $rpc can be undef if thread not enabled in Perl
-    if ($rpc) {
-        $self->{h}{TOKEN} = [$rpc->getToken()];
-    }
-
-    return $self;
-}
-
-sub dump {
-    my $self = shift;
-    print Dumper($self->{h});
-}
-
-sub getContent {
-    my ($self, $args) = @_;
-
-    $self->{accountinfo}->setAccountInfo($self);
-    my $content = XMLout(
-        $self->{h},
-        RootName => 'REQUEST',
-        XMLDecl => '<?xml version="1.0" encoding="UTF-8"?>',
-        SuppressEmpty => undef
+    return $class->SUPER::new(
+        query => 'PROLOG',
+        %params
     );
 
-    return $content;
 }
 
 1;
+__END__
+
+=head1 NAME
+
+FusionInventory::Agent::XML::Query::Prolog - Prolog agent message
+
+=head1 DESCRIPTION
+
+This is an initial message sent by the agent to the server before any task is
+processed, requiring execution parameters.
+
+=head1 METHODS
+
+=head2 new(%params)
+
+The constructor. The following parameters are allowed, in addition to those
+from the base class C<FusionInventory::Agent::XML::Query>, as keys of the
+%params hash:
+
+=over
+
+=item I<token>
+
+the authentication token for the web interface (mandatory)
+
+=back

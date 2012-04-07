@@ -2,7 +2,7 @@
 #
 # The complete name of the package
 # the path MUST be valid or the package won't be loaded
-package FusionInventory::Agent::Backend::OS::Generic::Tarballs;
+package FusionInventory::Agent::Task::Inventory::Input::Generic::Tarballs;
 use strict;
 # I need to declare $runAfter because of the strict mode 
 use vars qw($runAfter);
@@ -17,7 +17,7 @@ $runAfter = ["FusionInventory::Agent::Backend::OS::Generic"];
 # Check if we are on a linux server
 sub check { $^O =~ /^linux$/ }
 # uncomment this if you want check for FreeBSD server
-# sub check {can_run("pkg_info")}
+# sub check {canRun("pkg_info")}
 
 # its the main function of the script, it's called during the hardware inventory
 sub run {

@@ -3,54 +3,84 @@ package FusionInventory::Agent::XML::Response;
 use strict;
 use warnings;
 
-use Data::Dumper;
+use List::Util qw(first);
+use XML::TreePP;
 
-use XML::Simple;
 sub new {
-    my ($class, $params) = @_;
+    my ($class, %params) = @_;
 
-    my $self = {};
+    my $tpp = XML::TreePP->new(
+        force_array   => [ qw/
+            OPTION PARAM MODEL AUTHENTICATION RANGEIP DEVICE
+            / ],
+        attr_prefix   => '',
+        text_node_key => 'content'
+    );
+    my $content = $tpp->parse($params{content});
 
-    $self->{accountconfig} = $params->{accountconfig};
-    $self->{accountinfo} = $params->{accountinfo};
-    $self->{content}  = $params->{content};
-    $self->{config} = $params->{config};
-    my $logger = $self->{logger}  = $params->{logger};
-    $self->{origmsg}  = $params->{origmsg};
-    $self->{target}  = $params->{target};
+    die "content is not an XML message" unless ref $content eq 'HASH';
+    die "content is an invalid XML message" unless defined($content->{REPLY});
 
-    $logger->debug("=BEGIN=SERVER RET======");
-    $logger->debug(Dumper($self->{content}));
-    $logger->debug("=END=SERVER RET======");
-
-    $self->{parsedcontent}  = undef;
+    my $self = {
+        content => $content->{REPLY}
+    };
 
     bless $self, $class;
 
     return $self;
 }
 
-sub getRawXML {
-    my $self = shift;
+sub getContent {
+    my ($self) = @_;
 
     return $self->{content};
-
 }
 
-sub getParsedContent {
-    my $self = shift;
+sub getOptionsInfoByName {
+    my ($self, $name) = @_;
 
-    if(!$self->{parsedcontent} && $self->{content}) {
-        $self->{parsedcontent} = XML::Simple::XMLin( $self->{content}, ForceArray => ['OPTION','PARAM'] );
-    }
+    return unless $self->{content}->{OPTION};
 
-    return $self->{parsedcontent};
-}
-
-sub origMsgType {
-    my ($self, $package) = @_;
-
-    return ref($package);
+    return
+        first { $_->{NAME} eq $name }
+        @{$self->{content}->{OPTION}};
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+FusionInventory::Agent::XML::Response - Generic server message
+
+=head1 DESCRIPTION
+
+This is a generic message sent by the server to the agent.
+
+=head1 METHODS
+
+=head2 new(%params)
+
+The constructor. The following parameters are allowed, as keys of the %params
+hash:
+
+=over
+
+=item I<logger>
+
+the logger object to use (default: a new stderr logger)
+
+=item I<content>
+
+the raw XML content
+
+=back
+
+=head2 getContent
+
+Get content, as a perl data structure.
+
+=head2 getOptionsInfoByName($name)
+
+Get parameters of a specific option

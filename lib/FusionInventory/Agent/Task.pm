@@ -4,83 +4,127 @@ use strict;
 use warnings;
 
 use English qw(-no_match_vars);
+use File::Find;
+
+use FusionInventory::Agent::Tools;
+use FusionInventory::Agent::Logger;
 
 sub new {
-    my ($class, $params) = @_;
+    my ($class, %params) = @_;
 
-    my $self = {};
+    die 'no target parameter' unless $params{target};
 
-    $self->{config} = $params->{config};
-    $self->{logger} = $params->{logger};
-    $self->{target} = $params->{target};
-
-    $self->{module} = $params->{module};
-
-
-    my $config = $self->{config};
-    my $logger = $self->{logger};
-    my $module = $self->{module};
-
-
-    return if $config->{'no-'.lc($self->{module})};
-
-
+    my $self = {
+        logger       => $params{logger} ||
+                        FusionInventory::Agent::Logger->new(),
+        config       => $params{config},
+        confdir      => $params{confdir},
+        datadir      => $params{datadir},
+        target       => $params{target},
+        deviceid     => $params{deviceid},
+    };
     bless $self, $class;
-    if (!$self->isModInstalled()) {
-        $logger->debug("Module FusionInventory::Agent::Task::$module is not installed.");
-        return;
-    }
-
 
     return $self;
 }
 
-sub isModInstalled {
-    my ($self) = @_;
+sub getOptionsFromServer {
+    my ($self, $response, $name, $feature) = @_;
 
-    my $module = $self->{module};
-
-    foreach my $inc (@INC) {
-        return 1 if -f $inc.'/FusionInventory/Agent/Task/'.$module.'.pm'; 
+    if (!$response) {
+        $self->{logger}->debug("No server response");
+        return;
     }
 
-    return 0;
-}
-
-sub run {
-    my ($self) = @_;
-
-    my $config = $self->{config};
-    my $logger = $self->{logger};
-    my $target = $self->{target};
-    
-    my $module = $self->{module};
-
-
-    my $cmd;
-    $cmd .= "\"$EXECUTABLE_NAME\""; # The Perl binary path
-    if ($^O eq "MSWin32") {
-        $ENV{PERL5LIB}="";
-        $ENV{PERLLIB}="";
-        $cmd .= "  -Ilib" if $config->{devlib};
-        $cmd .= " -MFusionInventory::Agent::Task::".$module;
-        $cmd .= " -e \"FusionInventory::Agent::Task::".$module."::main();\" --";
-    } else {
-        $cmd .= " -e \"";
-        $cmd .= "\@INC=qw(";
-        $cmd .= $_." " foreach (@INC);
-        $cmd .= "); ";
-        $cmd .= "eval 'use FusionInventory::Agent::Task::$module;'; ";
-        $cmd .= "FusionInventory::Agent::Task::".$module."::main();\" --";
+    my $options = $response->getOptionsInfoByName($name);
+    if (!$options) {
+        $self->{logger}->debug("No $feature requested in the prolog");
+        return;
     }
-    $cmd .= " \"".$target->{vardir}."\"";
 
-    $logger->debug("cmd is: '$cmd'");
-    system($cmd);
-
-    $logger->debug("[task] end of ".$module);
-
+    return $options;
 }
 
+sub getModules {
+    my ($class, $prefix) = @_;
+
+    # allow to be called as an instance method
+    $class = ref $class ? ref $class : $class;
+
+    # use %INC to retrieve the root directory for this task
+    my $file = module2file($class);
+    my $rootdir = $INC{$file};
+    $rootdir =~ s/.pm$//;
+    return unless -d $rootdir;
+
+    # find a list of modules from files in this directory
+    my $root = $file;
+    $root =~ s/.pm$//;
+    $root .= "/$prefix" if $prefix;
+    my @modules;
+    my $wanted = sub {
+        return unless -f $_;
+        return unless $File::Find::name =~ m{($root/\S+\.pm)$};
+        my $module = file2module($1);
+        push(@modules, $module);
+    };
+    File::Find::find($wanted, $rootdir);
+    return @modules
+}
 
 1;
+__END__
+
+=head1 NAME
+
+FusionInventory::Agent::Task - Base class for agent task
+
+=head1 DESCRIPTION
+
+This is an abstract class for all task performed by the agent.
+
+=head1 METHODS
+
+=head2 new(%params)
+
+The constructor. The following parameters are allowed, as keys of the %params
+hash:
+
+=over
+
+=item I<logger>
+
+the logger object to use (default: a new stderr logger)
+
+=item I<config>
+
+=item I<target>
+
+=item I<storage>
+
+=item I<prologresp>
+
+=item I<client>
+
+=item I<deviceid>
+
+=back
+
+=head2 isEnabled()
+
+This is a method to be implemented by each subclass.
+
+=head2 run()
+
+This is a method to be implemented by each subclass.
+
+=head2 getOptionsFromServer($response, $name, $feature)
+
+Get task-specific options in server response to prolog message.
+
+=head2 getModules($prefix)
+
+Return a list of modules for this task. All modules installed at the same
+location than this package, belonging to __PACKAGE__ namespace, will be
+returned. If optional $prefix is given, base search namespace will be
+__PACKAGE__/$prefix instead.
