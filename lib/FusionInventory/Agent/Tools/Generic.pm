@@ -80,10 +80,11 @@ sub getCpusFromDmidecode {
             ($proc_version      && $proc_version eq '00000000000000000000000000000000');
 
         my $cpu = {
-            SERIAL => $info->{'Serial Number'},
-            ID     => $info->{ID},
-            CORE   => $info->{'Core Count'} || $info->{'Core Enabled'},
-            THREAD => $info->{'Thread Count'},
+            SERIAL     => $info->{'Serial Number'},
+            ID         => $info->{ID},
+            CORE       => $info->{'Core Count'} || $info->{'Core Enabled'},
+            THREAD     => $info->{'Thread Count'},
+            FAMILYNAME => $info->{'Family'}
         };
         $cpu->{MANUFACTURER} = $info->{'Manufacturer'} || $info->{'Processor Manufacturer'};
         $cpu->{NAME} =
@@ -92,6 +93,17 @@ sub getCpusFromDmidecode {
             $info->{'Processor Family'}                            ||
             $info->{'Processor Version'};
 
+       if ($cpu->{ID}) {
+
+            # Split CPUID to get access to its content
+            my @id = split ("",$cpu->{ID});
+            # convert hexadecimal value
+            $cpu->{STEPPING} = hex $id[1];
+            # family number is composed of 3 hexadecimal number
+            $cpu->{FAMILYNUMBER} = hex $id[9] . $id[10] . $id[4];
+            $cpu->{MODEL} = hex $id[7] . $id[0];
+        }
+
         if ($info->{Version}) {
             if ($info->{Version} =~ /([\d\.]+)MHz$/) {
                 $cpu->{SPEED} = $1;
@@ -99,13 +111,20 @@ sub getCpusFromDmidecode {
                 $cpu->{SPEED} = $1 * 1000;
             }
         }
-        if (!$cpu->{SPEED}) {
-            if ($info->{'Max Speed'}) {
-                if ($info->{'Max Speed'} =~ /^\s*(\d+)\s*Mhz/i) {
-                    $cpu->{SPEED} = $1;
-                } elsif ($info->{'Max Speed'} =~ /^\s*(\d+)\s*Ghz/i) {
-                    $cpu->{SPEED} = $1 * 1000;
-                }
+        if (!$cpu->{SPEED} && $info->{'Max Speed'}) {
+            # We only look for 3 digit Mhz frequency to avoid abvious bad
+            # value like 30000 (#633)
+            if ($info->{'Max Speed'} =~ /^\s*(\d{3,4})\s*Mhz/i) {
+                $cpu->{SPEED} = $1;
+            } elsif ($info->{'Max Speed'} =~ /^\s*(\d+)\s*Ghz/i) {
+                $cpu->{SPEED} = $1 * 1000;
+            }
+        }
+        if (!$cpu->{SPEED} && $info->{'Current Speed'}) {
+            if ($info->{'Current Speed'} =~ /^\s*(\d{3,4})\s*Mhz/i) {
+                $cpu->{SPEED} = $1;
+            } elsif ($info->{'Current Speed'} =~ /^\s*(\d+)\s*Ghz/i) {
+                $cpu->{SPEED} = $1 * 1000;
             }
         }
 

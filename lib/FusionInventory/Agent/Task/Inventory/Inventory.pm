@@ -18,7 +18,7 @@ my %fields = (
     CONTROLLERS => [ qw/CAPTION DRIVER NAME MANUFACTURER PCICLASS PCIID
                         PCISUBSYSTEMID PCISLOT TYPE REV/ ],
     CPUS        => [ qw/CACHE CORE DESCRIPTION MANUFACTURER NAME THREAD SERIAL
-                        SPEED ID EXTERNAL_CLOCK/ ],
+                        STEPPING FAMILYNAME FAMILYNUMBER MODEL SPEED ID EXTERNAL_CLOCK/ ],
     DRIVES      => [ qw/CREATEDATE DESCRIPTION FREE FILESYSTEM LABEL LETTER 
                         SERIAL SYSTEMDRIVE TOTAL TYPE VOLUMN/ ],
     ENVS        => [ qw/KEY VAL/ ],
@@ -41,7 +41,7 @@ my %fields = (
     SOFTWARES   => [ qw/COMMENTS FILESIZE FOLDER FROM HELPLINK INSTALLDATE NAME
                         NO_REMOVE RELEASE_TYPE PUBLISHER UNINSTALL_STRING 
                         URL_INFO_ABOUT VERSION VERSION_MINOR VERSION_MAJOR 
-                        IS64BIT GUID RELEASETYPE/ ],
+                        GUID ARCH/ ],
     SOUNDS      => [ qw/CAPTION DESCRIPTION MANUFACTURER NAME/ ],
     STORAGES    => [ qw/DESCRIPTION DISKSIZE INTERFACE MANUFACTURER MODEL NAME
                         TYPE SERIAL SERIALNUMBER FIRMWARE SCSI_COID SCSI_CHID
@@ -69,8 +69,8 @@ my %fields = (
                              VMID MAC COMMENT OWNER/ ],
     LOGICAL_VOLUMES  => [ qw/LV_NAME VGN_AME ATTR SIZE LV_UUID SEG_COUNT 
                              VG_UUID/ ],
-    PHYSICAL_VOLUMES => [ qw/DEVICE PV_NAME PV_PE_COUNT PV_UUID FORMAT ATTR 
-                             SIZE FREE PE_SIZE/ ],
+    PHYSICAL_VOLUMES => [ qw/DEVICE PV_PE_COUNT PV_UUID FORMAT ATTR
+                             SIZE FREE PE_SIZE VG_UUID/ ],
     VOLUME_GROUPS    => [ qw/VG_NAME PV_COUNT LV_COUNT ATTR SIZE FREE VG_UUID 
                              VG_EXTENT_SIZE/ ],
 );
@@ -684,6 +684,22 @@ Frequency in MHz
 =item ID
 
 The CPU ID: http://en.wikipedia.org/wiki/CPUID
+
+=item STEPPING
+
+Stepping value (Contained in CPUID)
+
+=item MODEL
+
+Model value (Contained in CPUID)
+
+=item FAMILYNUMBER
+
+Family value (Contained in CPUID)
+
+=item FAMILYNAME
+
+Family Name
 
 =back
 

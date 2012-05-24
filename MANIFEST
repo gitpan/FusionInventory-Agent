@@ -1,9 +1,5 @@
 Changes
 contrib/debian/fusioninventory-agent.init
-contrib/fedora/fusioninventory-agent.cron
-contrib/fedora/fusioninventory-agent.init
-contrib/fedora/fusioninventory-agent.spec
-contrib/fedora/README
 contrib/FusionInventory.adml
 contrib/FusionInventory.admx
 contrib/Tarballs.pm
@@ -422,6 +418,7 @@ resources/generic/ifconfig/aix-6.1
 resources/generic/ifconfig/dell-xt2
 resources/generic/ifconfig/dragonfly-1
 resources/generic/ifconfig/freebsd-8.1
+resources/generic/ifconfig/freebsd-bis
 resources/generic/ifconfig/hpux1-lan0
 resources/generic/ifconfig/hpux2-lan0
 resources/generic/ifconfig/linux-archlinux
@@ -544,6 +541,8 @@ resources/linux/hponcfg/sample2
 resources/linux/ip/ip_addr-1
 resources/linux/ip/ip_addr-2
 resources/linux/ip/ip_addr-3
+resources/linux/mpt-status/sample1
+resources/linux/mpt-status/sample2
 resources/linux/packaging/dpkg
 resources/linux/packaging/rpm
 resources/linux/proc/cpuinfo/cpuinfo-vmware-esx
@@ -553,6 +552,7 @@ resources/linux/proc/cpuinfo/linux-686-1
 resources/linux/proc/cpuinfo/linux-686-samsung-nc10-1
 resources/linux/proc/cpuinfo/linux-alpha-1
 resources/linux/proc/cpuinfo/linux-armel-1
+resources/linux/proc/cpuinfo/linux-armel-2
 resources/linux/proc/cpuinfo/linux-hp-dl180
 resources/linux/proc/cpuinfo/linux-ia64-1
 resources/linux/proc/cpuinfo/linux-mips-1
@@ -563,9 +563,14 @@ resources/linux/proc/cpuinfo/linux-sparc-1
 resources/linux/proc/cpuinfo/toshiba-r630-2-core
 resources/linux/proc/scsi/linux1
 resources/linux/proc/scsi/linux2
+resources/linux/proc/scsi/linux3
+resources/linux/proc/scsi/linux4
 resources/linux/README
 resources/linux/rhn-systemid/ID-1232324425
-resources/linux/smartctl/dell-xt2
+resources/linux/smartctl/sample1
+resources/linux/smartctl/sample2
+resources/linux/smartctl/sample3
+resources/linux/smartctl/sample4
 resources/linux/tw_cli/cards
 resources/linux/tw_cli/ports
 resources/linux/tw_cli/storage
@@ -574,16 +579,22 @@ resources/linux/udev/ssd
 resources/lvm/linux/lvs/linux-1
 resources/lvm/linux/lvs/README
 resources/lvm/linux/pvs/linux-1
+resources/lvm/linux/pvs/linux-2
+resources/lvm/linux/pvs/linux-3
 resources/lvm/linux/pvs/README
 resources/lvm/linux/vgs/linux-1
+resources/lvm/linux/vgs/linux-2
+resources/lvm/linux/vgs/linux-3
 resources/lvm/linux/vgs/README
 resources/macos/ioreg/IOPlatformExpertDevice
 resources/macos/ioreg/IOUSBDevice1
 resources/macos/ioreg/IOUSBDevice2
+resources/macos/sysctl/10.6-macmini
 resources/macos/SysProfile/sample1.yaml
 resources/macos/system_profiler/10.4-powerpc
 resources/macos/system_profiler/10.5-powerpc
 resources/macos/system_profiler/10.6-intel
+resources/macos/system_profiler/10.6-macmini
 resources/macos/system_profiler/10.6.6-intel
 resources/macos/system_profiler/datatypes
 resources/solaris/fcinfo_hba-port/sample-1
@@ -592,6 +603,7 @@ resources/solaris/iostat/sample2
 resources/solaris/iostat/sample3-wrong-vendor-product
 resources/solaris/memconf/sample1
 resources/solaris/memconf/sample2
+resources/solaris/memconf/sample3
 resources/solaris/memconf/sample4
 resources/solaris/opensolaris/release-1
 resources/solaris/opensolaris/smbios-1
@@ -614,12 +626,14 @@ resources/virtualization/prlctl/sample1
 resources/virtualization/README
 resources/virtualization/vboxmanage/sample1
 resources/virtualization/vboxmanage/sample2
+resources/virtualization/vboxmanage/sample3
 resources/virtualization/virsh/dumpxml1
 resources/virtualization/virsh/dumpxml2
 resources/virtualization/virsh/dumpxml3
 resources/virtualization/virsh/list1
 resources/virtualization/virsh/list2
-resources/virtualization/xm/sample1
+resources/virtualization/xm/xm_list
+resources/virtualization/xm/xm_list_-l_vmname
 resources/win32/README
 resources/win32/registry/2003-CentralProcessor.reg
 resources/win32/registry/2003SP2-CentralProcessor.reg
@@ -627,6 +641,7 @@ resources/win32/registry/7-CentralProcessor.reg
 resources/win32/registry/7-USB.reg
 resources/win32/registry/7-USBPRINT.reg
 resources/win32/registry/xp-CentralProcessor.reg
+resources/win32/registry/xp-uninstall.reg
 resources/win32/registry/xppro1-USB.reg
 resources/win32/registry/xppro1-USBPRINT.reg
 resources/win32/registry/xppro2-USB.reg
@@ -648,6 +663,7 @@ resources/win32/wmi/xp-Win32_NetworkAdapterConfiguration.wmi
 resources/win32/wmi/xp-Win32_PhysicalMemory.wmi
 resources/win32/wmi/xp-Win32_PhysicalMemoryArray.wmi
 resources/win32/wmi/xp-Win32_Processor.wmi
+resources/win32/wmi/xp-Win32_QuickFixEngineering.wmi
 resources/win32/wmi/xppro2-CIM_LogicalDevice.wmi
 resources/xml/response/message1.xml
 resources/xml/response/message2.xml
@@ -682,6 +698,7 @@ t/components/task.t
 t/fake/unix/Sys/Syslog.pm
 t/fake/windows/Win32.pm
 t/fake/windows/Win32/API.pm
+t/fake/windows/Win32/Job.pm
 t/fake/windows/Win32/OLE.pm
 t/fake/windows/Win32/TieRegistry.pm
 t/FusionInventory/Agent/Logger/Test.pm
@@ -729,7 +746,9 @@ t/inventory/linux/rhn-systemid.t
 t/inventory/linux/softwares.t
 t/inventory/linux/storages/3ware.t
 t/inventory/linux/storages/adaptec.t
+t/inventory/linux/storages/lsilogic.t
 t/inventory/linux/video.t
+t/inventory/macos/cpu.t
 t/inventory/macos/memory.t
 t/inventory/macos/softwares.t
 t/inventory/macos/storages.t
@@ -748,6 +767,7 @@ t/inventory/windows/cpu.t
 t/inventory/windows/memory.t
 t/inventory/windows/networks.t
 t/inventory/windows/printers.t
+t/inventory/windows/softwares.t
 t/inventory/windows/usb.t
 t/perlcriticrc
 t/ssl/cnf/alternate.cnf
@@ -779,6 +799,7 @@ t/tools/linux.t
 t/tools/macos.t
 t/tools/network.t
 t/tools/unix.t
+t/tools/win32.t
 t/xml/query/inventory.t
 t/xml/query/prolog.t
 t/xml/query/simpleMessage.t

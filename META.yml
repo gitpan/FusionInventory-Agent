@@ -6,6 +6,7 @@ build_requires:
   HTTP::Server::Simple: 0
   HTTP::Server::Simple::Authen: 0
   IO::Capture::Stderr: 0
+  IO::Socket::SSL: 0
   IPC::Run: 0
   Test::Exception: 0
   Test::MockModule: 0
@@ -44,4 +45,4 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.2.0
+version: 2.2.1

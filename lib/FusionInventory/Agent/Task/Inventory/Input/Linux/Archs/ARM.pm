@@ -34,8 +34,8 @@ sub _getCPUsFromProc {
 
     foreach my $cpu (getCPUsFromProc(@_)) {
         push @cpus, {
-            ARCH => 'ARM',
-            TYPE => $cpu->{processor}
+            ARCH  => 'ARM',
+            TYPE  => $cpu->{processor}
         };
     }
 

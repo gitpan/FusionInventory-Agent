@@ -22,7 +22,7 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Hostname;
 use FusionInventory::Agent::XML::Query::Prolog;
 
-our $VERSION = '2.2.0';
+our $VERSION = '2.2.1';
 our $VERSION_STRING = 
     "FusionInventory unified agent for UNIX, Linux and MacOSX ($VERSION)";
 our $AGENT_STRING =
@@ -385,7 +385,7 @@ sub _getTaskVersion {
     my $logger = $self->{logger};
 
     if (!$module->require()) {
-        $logger->debug2("module $module does not compile") if $logger;
+        $logger->debug2("module $module does not compile: $@") if $logger;
         return;
     }
 
