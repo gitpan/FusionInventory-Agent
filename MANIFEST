@@ -675,6 +675,7 @@ share/html/logo.png
 share/html/now.tpl
 share/html/site.css
 share/pci.ids
+SIGNATURE
 t/01compile.t
 t/02critic.t
 t/03pod.t

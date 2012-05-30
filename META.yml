@@ -8,6 +8,7 @@ build_requires:
   IO::Capture::Stderr: 0
   IO::Socket::SSL: 0
   IPC::Run: 0
+  LWP::Protocol::https: 0
   Test::Exception: 0
   Test::MockModule: 0
   Test::More: 0.93
@@ -31,6 +32,7 @@ recommends:
   Compress::Zlib: 0
   HTTP::Daemon: 0
   IO::Socket::SSL: 0
+  LWP::Protocol::https: 0
   Net::CUPS: 0.6
   Proc::Daemon: 0
   Proc::PID::File: 0
@@ -45,4 +47,4 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.2.1
+version: 2.2.2
