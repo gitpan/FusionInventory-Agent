@@ -8,6 +8,7 @@ contrib/yum-plugin/fusioninventory-agent.py
 contrib/yum-plugin/INSTALL
 etc/agent.cfg
 fusioninventory-agent
+fusioninventory-agent.1.html
 fusioninventory-injector
 fusioninventory-win32-service
 inc/Module/AutoInstall.pm
@@ -161,6 +162,7 @@ lib/FusionInventory/Agent/Task/Inventory/Input/Solaris/Storages.pm
 lib/FusionInventory/Agent/Task/Inventory/Input/Virtualization.pm
 lib/FusionInventory/Agent/Task/Inventory/Input/Virtualization/Hpvm.pm
 lib/FusionInventory/Agent/Task/Inventory/Input/Virtualization/Libvirt.pm
+lib/FusionInventory/Agent/Task/Inventory/Input/Virtualization/Lxc.pm
 lib/FusionInventory/Agent/Task/Inventory/Input/Virtualization/Parallels.pm
 lib/FusionInventory/Agent/Task/Inventory/Input/Virtualization/Qemu.pm
 lib/FusionInventory/Agent/Task/Inventory/Input/Virtualization/SolarisZones.pm
@@ -622,6 +624,9 @@ resources/solaris/showrev/x86-2
 resources/solaris/showrev/x86-3
 resources/solaris/smbios/x86-1
 resources/solaris/smbios/x86-3
+resources/virtualization/lxc/config
+resources/virtualization/lxc/lxc-info_-n_name1
+resources/virtualization/lxc/lxc-ls_-1
 resources/virtualization/prlctl/sample1
 resources/virtualization/README
 resources/virtualization/vboxmanage/sample1
@@ -675,7 +680,6 @@ share/html/logo.png
 share/html/now.tpl
 share/html/site.css
 share/pci.ids
-SIGNATURE
 t/01compile.t
 t/02critic.t
 t/03pod.t
@@ -761,6 +765,7 @@ t/inventory/solaris/cpu.t
 t/inventory/solaris/networks.t
 t/inventory/solaris/storages.t
 t/inventory/virtualization/libvirt.t
+t/inventory/virtualization/lxc.t
 t/inventory/virtualization/parallels.t
 t/inventory/virtualization/virtualbox.t
 t/inventory/virtualization/xen.t

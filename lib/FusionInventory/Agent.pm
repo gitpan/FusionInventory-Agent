@@ -22,7 +22,7 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Hostname;
 use FusionInventory::Agent::XML::Query::Prolog;
 
-our $VERSION = '2.2.2';
+our $VERSION = '2.2.3';
 our $VERSION_STRING = 
     "FusionInventory unified agent for UNIX, Linux and MacOSX ($VERSION)";
 our $AGENT_STRING =
@@ -218,6 +218,7 @@ sub _runTarget {
     if ($target->isa('FusionInventory::Agent::Target::Server')) {
         my $client = FusionInventory::Agent::HTTP::Client::OCS->new(
             logger       => $self->{logger},
+            timeout      => $self->{timeout},
             user         => $self->{config}->{user},
             password     => $self->{config}->{password},
             proxy        => $self->{config}->{proxy},

@@ -51,6 +51,7 @@ GetOptions(
     'server|s=s',
     'stdout',
     'tag|t=s',
+    'timeout=i',
     'user|u=s',
     'version',
     'wait|w=s',
@@ -159,6 +160,7 @@ B<fusioninventory-agent> [options] [--server server|--local directory|--sdout]
     --ca-cert-dir=D     path to the CA certificates directory
     --ca-cert-file=F    path to the CA certificates file
     --no-ssl-check      do not check server SSL certificates (false)
+    --timeout           connection timeout (180)
 
   Web interface options
     --no-httpd                 disable embedded web server (false)
@@ -452,6 +454,9 @@ The network port to use for the embedded web server (62354).
 =item B<--httpd-trust>=I<RANGE>
 
 Trust requests from given range without authentication token (false).
+
+For example: "192.168.0.0/24", "192.68.168.0.5" or an IP range like
+"20.34.101.207 - 201.3.9.99". See L<Net::IP> documentation to get more example.
 
 =back
 
