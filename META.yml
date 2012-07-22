@@ -39,7 +39,7 @@ recommends:
 requires:
   Digest::MD5: 0
   File::Which: 0
-  LWP: 0
+  LWP: 5.8
   Net::IP: 0
   Text::Template: 0
   UNIVERSAL::require: 0
@@ -47,4 +47,4 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.2.3
+version: 2.2.4

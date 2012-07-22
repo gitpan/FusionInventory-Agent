@@ -8,7 +8,6 @@ contrib/yum-plugin/fusioninventory-agent.py
 contrib/yum-plugin/INSTALL
 etc/agent.cfg
 fusioninventory-agent
-fusioninventory-agent.1.html
 fusioninventory-injector
 fusioninventory-win32-service
 inc/Module/AutoInstall.pm
@@ -597,8 +596,10 @@ resources/macos/system_profiler/10.4-powerpc
 resources/macos/system_profiler/10.5-powerpc
 resources/macos/system_profiler/10.6-intel
 resources/macos/system_profiler/10.6-macmini
+resources/macos/system_profiler/10.6.5-dual-monitor
 resources/macos/system_profiler/10.6.6-intel
 resources/macos/system_profiler/datatypes
+resources/macos/system_profiler/fiberchannel
 resources/solaris/fcinfo_hba-port/sample-1
 resources/solaris/iostat/sample1
 resources/solaris/iostat/sample2
@@ -773,6 +774,7 @@ t/inventory/windows/cpu.t
 t/inventory/windows/memory.t
 t/inventory/windows/networks.t
 t/inventory/windows/printers.t
+t/inventory/windows/registry.t
 t/inventory/windows/softwares.t
 t/inventory/windows/usb.t
 t/perlcriticrc
