@@ -354,6 +354,9 @@ sub computeChecksum {
                 $self->{last_state_content} = XML::TreePP->new()->parsefile(
                     $self->{last_state_file}
                 );
+            };
+            if (ref($self->{last_state_content}) ne 'HASH') {
+                $self->{last_state_file} = {};
             }
         } else {
             $logger->debug(

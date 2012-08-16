@@ -4,9 +4,10 @@ use strict;
 use warnings;
 
 use FusionInventory::Agent::Tools;
+use FusionInventory::Agent::Tools::Unix;
 use FusionInventory::Agent::Tools::Network;
 
-#TODO Get driver pcislot virtualdev
+#TODO Get pcislot virtualdev
 
 sub isEnabled {
     return canRun('lanscan');
@@ -40,27 +41,59 @@ sub doInventory {
 sub _getInterfaces {
     my (%params) = @_;
 
-    my @interfaces = _parseLanscan(
+    my @prototypes = _parseLanscan(
         command => 'lanscan -iap',
         logger  => $params{logger}
     );
 
-    foreach my $interface (@interfaces) {
-        $interface->{IPSUBNET} = getSubnetAddress(
-            $interface->{IPADDRESS},
-            $interface->{IPMASK}
-        );
+    my %ifStatNrv = _parseNetstatNrv();
 
-        # Some cleanups
-        if ($interface->{IPADDRESS} eq '0.0.0.0') {
-            $interface->{IPADDRESS} = "";
+    my @interfaces;
+    foreach my $prototype (@prototypes) {
+
+        my $lanadminInfo = _getLanadminInfo(
+            command => "lanadmin -g $prototype->{lan_id}",
+            logger  => $params{logger}
+        );
+        $prototype->{TYPE}  = $lanadminInfo->{'Type (value)'};
+        $prototype->{SPEED} = $lanadminInfo->{Speed} > 1000000 ?
+            $lanadminInfo->{Speed} / 1000000 : $lanadminInfo->{Speed};
+
+        if ($ifStatNrv{$prototype->{DESCRIPTION}}) {
+            # if this interface name has been found in netstat output, let's
+            # use the list of interfaces found there, using the prototype
+            # to provide additional informations
+            foreach my $interface (@{$ifStatNrv{$prototype->{DESCRIPTION}}}) {
+                foreach my $key (qw/MACADDR STATUS TYPE SPEED/) {
+                    next unless $prototype->{$key};
+                    $interface->{$key} = $prototype->{$key};
+                }
+                push @interfaces, $interface;
+            }
+        } else {
+            # otherwise, we promote this prototype to an interface, using
+            # ifconfig to provide additional informations
+            my $ifconfigInfo = _getIfconfigInfo(
+                command => "ifconfig $prototype->{DESCRIPTION}",
+                logger  => $params{logger}
+            );
+            $prototype->{STATUS}    = $ifconfigInfo->{status};
+            $prototype->{IPADDRESS} = $ifconfigInfo->{address};
+            $prototype->{IPMASK}    = $ifconfigInfo->{netmask};
+            delete $prototype->{lan_id};
+            push @interfaces, $prototype;
         }
-        if (
-            not $interface->{IPADDRESS} and
-            not $interface->{IPMASK} and
-            $interface->{IPSUBNET} eq '0.0.0.0'
-        ) {
-            $interface->{IPSUBNET} = "";
+    }
+
+    foreach my $interface (@interfaces) {
+        if ($interface->{IPADDRESS} && $interface->{IPADDRESS} eq '0.0.0.0') {
+            $interface->{IPADDRESS} = undef;
+            $interface->{IPMASK}    = undef;
+        } else {
+            $interface->{IPSUBNET} = getSubnetAddress(
+                $interface->{IPADDRESS},
+                $interface->{IPMASK}
+            );
         }
     }
 
@@ -75,29 +108,22 @@ sub _parseLanscan {
 
     my @interfaces;
     while (my $line = <$handle>) {
-        next unless /^0x($alt_mac_address_pattern)\s(\S+)\s(\S+)\s+(\S+)/;
+        next unless $line =~ /^
+            0x($alt_mac_address_pattern)
+            \s
+            (\S+)
+            \s
+            \S+
+            \s+
+            (\S+)
+            /x;
+
         my $interface = {
-            MACADDR => alt2canonical($1),
-            STATUS => 'Down'
+            MACADDR     => alt2canonical($1),
+            STATUS      => 'Down',
+            DESCRIPTION => $2,
+            lan_id      => $3,
         };
-        my $name = $2;
-        my $lanid = $4;
-
-        my $lanadminInfo = _getLanadminInfo(
-            command => "lanadmin -g $lanid", logger => $params{logger}
-        );
-        $interface->{TYPE}        = $lanadminInfo->{'Type (value)'};
-        $interface->{DESCRIPTION} = $lanadminInfo->{Description};
-        $interface->{SPEED}       = $lanadminInfo->{Speed} > 1000000 ?
-                                        $lanadminInfo->{Speed} / 1000000 :
-                                        $lanadminInfo->{Speed};
-
-        my $ifconfigInfo = _getIfconfigInfo(
-            command => "ifconfig $name", logger => $params{logger}
-        );
-        $interface->{STATUS}    = $ifconfigInfo->{status};
-        $interface->{IPADDRESS} = $ifconfigInfo->{address};
-        $interface->{IPMASK}    = $ifconfigInfo->{netmask};
 
         push @interfaces, $interface;
     }
@@ -139,6 +165,85 @@ sub _getIfconfigInfo {
     close $handle;
 
     return $info;
+}
+
+# will be need to get the bonding configuration
+sub _getNwmgrInfo {
+    my $handle = getFileHandle(@_);
+    return unless $handle;
+
+    my $info;
+    while (my $line = <$handle>) {
+        next unless $line =~ /^
+            (\w+)
+            \s+
+            (\w+)
+            \s+
+            0x($alt_mac_address_pattern)
+            \s+
+            (\w+)
+            \s+
+            (\w*)
+            /x;
+        my $interface = $1;
+
+        $info->{$interface} = {
+            status     => $2,
+            mac        => alt2canonical($3),
+            driver     => $4,
+            media      => $5,
+            related_if => undef
+        }
+    }
+    close $handle;
+
+    return $info;
+}
+
+sub _parseNetstatNrv {
+    my (%params) = (
+        command => 'netstat -nrv',
+        @_
+    );
+
+    my $handle = getFileHandle(%params);
+    return unless $handle;
+
+    my %interfaces;
+    while (my $line = <$handle>) {
+        next unless $line =~ /^
+            ($ip_address_pattern) # address
+            \/
+            ($ip_address_pattern) # mask
+            \s+
+            ($ip_address_pattern) # gateway
+            \s+
+            [A-Z]* H [A-Z]*       # host flag
+            \s+
+            \d
+            \s+
+            (\w+) (?: :\d+)?      # interface name, with optional alias
+            \s+
+            (\d+)                 # MTU
+            $/x;
+
+        my $address   = $1;
+        my $mask      = $2;
+        my $gateway   = $3 if $3 ne $1;
+        my $interface = $4;
+        my $mtu       = $5;
+
+        push @{$interfaces{$interface}}, {
+            IPADDRESS   => $address,
+            IPMASK      => $mask,
+            IPGATEWAY   => $gateway,
+            DESCRIPTION => $interface,
+            MTU         => $mtu
+        }
+    }
+    close $handle;
+
+    return %interfaces;
 }
 
 1;
