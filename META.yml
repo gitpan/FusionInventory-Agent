@@ -37,7 +37,6 @@ recommends:
   Proc::Daemon: 0
   Proc::PID::File: 0
 requires:
-  Digest::MD5: 0
   File::Which: 0
   LWP: 5.8
   Net::IP: 0
@@ -47,4 +46,4 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.2.5
+version: 2.2.6

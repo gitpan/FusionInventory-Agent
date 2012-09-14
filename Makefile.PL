@@ -10,7 +10,6 @@ version_from 'lib/FusionInventory/Agent.pm';
 perl_version '5.008';
 
 # mandatory dependencies
-requires 'Digest::MD5'        => undef;
 requires 'File::Which'        => undef;
 requires 'LWP'                => '5.8';
 requires 'Net::IP'            => undef;
@@ -21,21 +20,23 @@ requires 'XML::TreePP'        => '0.26';
 if ($OSNAME eq 'darwin') {
     requires 'Mac::SysProfile' => undef;
 }
+if ($OSNAME eq 'MSWin32') {
+    requires 'Win32::OLE'         => undef;
+    requires 'Win32::TieRegistry' => undef;
+    requires 'Win32::Job'         => undef;
+}
 
 # optional dependencies
 recommends 'Compress::Zlib'   => undef;
 recommends 'HTTP::Daemon'     => undef;
-recommends 'Net::CUPS'        => 0.60;
 recommends 'IO::Socket::SSL'  => undef;
 recommends 'LWP::Protocol::https'  => undef;
 
 if ($OSNAME ne 'MSWin32') {
+    recommends 'Net::CUPS'        => 0.60;
     recommends 'Proc::Daemon'     => undef;
     recommends 'Proc::PID::File'  => undef;
 } else {
-    requires 'Win32::OLE' => undef;
-    requires 'Win32::TieRegistry' => undef;
-    requires 'Win32::Job' => undef;
     recommends 'Win32::Daemon'    => undef;
 }
 
@@ -151,7 +152,9 @@ sub install {
 
     # add dependency on data and configuration installation targets, and remove
     # dependency on perlocal installation target
+    # depending on MakeMaker version, the line to match changes
     $install =~ s/install :: pure_install doc_install/install :: pure_install config_install data_install/;
+    $install =~ s/install :: all pure_install doc_install/install :: all pure_install config_install data_install/;
 
     # suppress all lines related to packlist file installation
     $install =~ s/.*\.packlist \\\n//g;
@@ -195,16 +198,4 @@ FINALIZE = $(ABSPERLRUN) -pi \
     --
 EOF
     return $installbin;
-}
-
-sub manifypods {
-    my ($self) = @_;
-    my $manifypods = $self->SUPER::manifypods(@_);
-    $manifypods =~ s/manifypods : pure_all/manifypods : pure_all fusioninventory-agent.1.html/;
-    $manifypods .= <<'EOF';
-fusioninventory-agent.1.html: fusioninventory-agent
-	pod2html --infile=$< --outfile=$@
-
-EOF
-    return $manifypods;
 }
