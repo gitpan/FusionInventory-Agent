@@ -9,6 +9,7 @@ use constant PF_PACKET => 17;
 use constant SOCK_PACKET => 10;
 
 use English qw(-no_match_vars);
+use List::Util qw(first);
 use Socket;
 
 use FusionInventory::Agent::Tools;
@@ -85,6 +86,8 @@ sub run {
     # degraded WOL by UDP
     eval {
         socket(SOCKET, PF_INET, SOCK_DGRAM, getprotobyname('udp'));
+        setsockopt(SOCKET, SOL_SOCKET, SO_BROADCAST, 1)
+            or warn "Can't do setsockopt: $ERRNO\n";
         my $magic_packet = 
             chr(0xFF) x 6 .
             (pack('H12', $target) x 16);

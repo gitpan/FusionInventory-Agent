@@ -443,6 +443,8 @@ resources/generic/edid/lcd.acer-al19161.3
 resources/generic/edid/lcd.acer-al19161.4
 resources/generic/edid/lcd.acer-al1921
 resources/generic/edid/lcd.acer-asp1680
+resources/generic/edid/lcd.acer-v193.1
+resources/generic/edid/lcd.acer-v193.2
 resources/generic/edid/lcd.acer-x193hq
 resources/generic/edid/lcd.b-101750
 resources/generic/edid/lcd.benq-t904
@@ -462,6 +464,8 @@ resources/generic/edid/lcd.HP-Pavilion-ZV6000
 resources/generic/edid/lcd.iiyama-pl2409hd
 resources/generic/edid/lcd.lenovo-3000-v100
 resources/generic/edid/lcd.lenovo-w500
+resources/generic/edid/lcd.lg-l1960.1
+resources/generic/edid/lcd.lg-l1960.2
 resources/generic/edid/lcd.philips-150s
 resources/generic/edid/lcd.philips-180b2
 resources/generic/edid/lcd.presario-R4000
@@ -485,6 +489,7 @@ resources/generic/ifconfig/dell-xt2
 resources/generic/ifconfig/dragonfly-1
 resources/generic/ifconfig/freebsd-8.1
 resources/generic/ifconfig/freebsd-bis
+resources/generic/ifconfig/freebsd-ter
 resources/generic/ifconfig/hpux1-lan0
 resources/generic/ifconfig/hpux2-lan0
 resources/generic/ifconfig/linux-archlinux
@@ -682,6 +687,14 @@ resources/solaris/opensolaris/release-1
 resources/solaris/opensolaris/smbios-1
 resources/solaris/prtconf/SPARC-1
 resources/solaris/psrinfo/sample1
+resources/solaris/psrinfo/unstable10s-psrinfo_v
+resources/solaris/psrinfo/unstable10s-psrinfo_vp
+resources/solaris/psrinfo/unstable10x-psrinfo_v
+resources/solaris/psrinfo/unstable10x-psrinfo_vp
+resources/solaris/psrinfo/unstable9s-psrinfo_v
+resources/solaris/psrinfo/unstable9s-psrinfo_vp
+resources/solaris/psrinfo/unstable9x-psrinfo_v
+resources/solaris/psrinfo/unstable9x-psrinfo_vp
 resources/solaris/release-1
 resources/solaris/release-2
 resources/solaris/release-3
@@ -773,6 +786,7 @@ share/html/logo.png
 share/html/now.tpl
 share/html/site.css
 share/pci.ids
+SIGNATURE
 t/01compile.t
 t/02critic.t
 t/03pod.t
@@ -780,9 +794,9 @@ t/04pod-coverage.t
 t/05var.t
 t/06spelling.t
 t/07pciids.t
+t/08changelog.t
 t/apps/agent.t
 t/apps/injector.t
-t/changelog.t
 t/components/agent.t
 t/components/client/connection.t
 t/components/client/instanciation.t
@@ -869,6 +883,7 @@ t/inventory/virtualization/lxc.t
 t/inventory/virtualization/parallels.t
 t/inventory/virtualization/virtualbox.t
 t/inventory/virtualization/xen.t
+t/inventory/windows/bios.t
 t/inventory/windows/cpu.t
 t/inventory/windows/memory.t
 t/inventory/windows/networks.t

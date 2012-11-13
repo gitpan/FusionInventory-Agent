@@ -73,12 +73,26 @@ sub _getEdidInfo {
     # http://forge.fusioninventory.org/issues/1614
     if (
         $edid->{EISA_ID} &&
-        $edid->{EISA_ID} =~ /^ACR(0018|0020|00A8|7883|ad49|adaf)$/
+        $edid->{EISA_ID} =~ /^ACR(0018|0020|0024|00A8|7883|ad49|adaf)$/
     ) {
         $info->{SERIAL} =
             substr($edid->{serial_number2}->[0], 0, 8) .
             sprintf("%08x", $edid->{serial_number})    .
             substr($edid->{serial_number2}->[0], 8, 4) ;
+    } elsif (
+        $edid->{EISA_ID} &&
+        $edid->{EISA_ID} eq 'GSM4b21'
+    ) {
+        # split serial in two parts
+        my ($high, $low) = $edid->{serial_number} =~ /(\d+) (\d\d\d)$/x;
+
+        # translate the first part using a custom alphabet
+        my @alphabet = split(//, "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
+        my $base     = scalar @alphabet;
+
+        $info->{SERIAL} =
+            $alphabet[$high / $base] . $alphabet[$high % $base] .
+            $low;
     } else {
         $info->{SERIAL} = $edid->{serial_number2} ?
             $edid->{serial_number2}->[0]           :

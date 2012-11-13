@@ -178,6 +178,18 @@ my %tests = (
         SERIAL       => '00000000',
         DESCRIPTION  => '51/2004'
     },
+    'lcd.acer-v193.1' => {
+        MANUFACTURER => 'Acer America Corp.',
+        CAPTION      => 'Acer V193',
+        SERIAL       => 'LBZ081610080b6974233',
+        DESCRIPTION  => '8/2010'
+    },
+    'lcd.acer-v193.2' => {
+        MANUFACTURER => 'Acer America Corp.',
+        CAPTION      => 'Acer V193',
+        SERIAL       => 'LBZ081610050c5b24233',
+        DESCRIPTION  => '5/2010'
+    },
     'lcd.acer-x193hq' => {
         MANUFACTURER => 'Acer America Corp.',
         CAPTION      => 'X193HQ',
@@ -279,6 +291,18 @@ my %tests = (
         CAPTION      => 'PL2409HD',
         SERIAL       => '11004M0C00313',
         DESCRIPTION  => '49/2010'
+    },
+    'lcd.lg-l1960.1' => {
+        MANUFACTURER => 'LG Electronics Inc. (GoldStar Technology, Inc.)',
+        CAPTION      => 'L1960TR ',
+        SERIAL       => '9Y670',
+        DESCRIPTION  => '11/2007'
+    },
+    'lcd.lg-l1960.2' => {
+        MANUFACTURER => 'LG Electronics Inc. (GoldStar Technology, Inc.)',
+        CAPTION      => 'L1960TR ',
+        SERIAL       => '9Y676',
+        DESCRIPTION  => '11/2007'
     },
     'lcd.lenovo-3000-v100' => {
         MANUFACTURER => 'AU Optronics',

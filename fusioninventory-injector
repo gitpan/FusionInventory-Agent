@@ -24,33 +24,66 @@ my %options = (
     useragent => 'FusionInventory-Injector'
 );
 
+GetOptions(
+    \%options,
+    'help|h',
+    'directory|d=s',
+    'file|f=s',
+    'url|u=s',
+    'useragent=s',
+    'remove|r',
+    'verbose|v',
+    'stdin',
+);
+
+$OUTPUT_AUTOFLUSH = 1;
+pod2usage() if $options{help};
+
+if ($options{stdin}) {
+    loadstdin();
+} elsif ($options{file}) {
+    die "file $options{file} does not exist"
+        unless -f $options{file};
+    loadfile($options{file});
+} elsif ($options{directory}) {
+    die "directory $options{directory} does not exist"
+        unless -d $options{directory};
+   loaddirectory($options{directory});
+} else {
+    pod2usage();
+}
+
 sub loadfile {
-    my $file = shift;
+    my ($file) = @_;
 
     die "can't read file $file" unless -r $file;
 
     print "Loading $file..." if $options{verbose};
 
-    open (my $fh, '<', $file) or die "can't open file $file: $ERRNO";
+    open (my $handle, '<', $file) or die "can't open file $file: $ERRNO\n";
     ## no critic (ProhibitBitwise)
-    flock ($fh, LOCK_EX | LOCK_NB) or die "can't lock file $file: $ERRNO";
+    flock ($handle, LOCK_EX | LOCK_NB) or die "can't lock file $file: $ERRNO\n";
     local $RS;
-    my $content = <$fh>;
-    close $fh or die "Can't close file $file: $ERRNO";
+    my $content = <$handle>;
+    close $handle or die "Can't close file $file: $ERRNO\n";
 
-    sendContent($content);
+    my $success = sendContent($content);
+    if ($success && $options{remove}) {
+        unlink $file or warn "Can't remove $file: $ERRNO\n"
+    }
 }
 
 sub loaddirectory {
-    my $directory = shift;
+    my ($directory) = @_;
 
     die "can't read directory $directory" unless -r $directory;
 
-    opendir (my $dh, $directory) or die "can't open directory $directory: $ERRNO";
-    foreach ( readdir($dh) ) {
-        loadfile("$directory/$_") if (/\.ocs$/);
+    opendir (my $handle, $directory)
+        or die "can't open directory $directory: $ERRNO\n";
+    foreach my $file (readdir($handle)) {
+        loadfile("$directory/$file") if $file =~ /\.ocs$/;
     }
-    closedir $dh;
+    closedir $handle;
 }
 
 sub loadstdin {
@@ -76,46 +109,13 @@ sub sendContent {
     $request->content(compress($content));
     my $res = $ua->request($request);
 
-    if ($res->is_success()) {
-        print "OK\n" if $options{verbose};
-        print STDERR "Can't remove $options{file}: $ERRNO\n"
-            if ($options{remove} && (!unlink $options{file}));
-    } else {
-        if ($options{verbose}) {
-            print "ERROR: ";
-            print $res->status_line(), "\n";
-        }
+    if ($options{verbose}) {
+        print $res->is_success() ?
+            "OK\n" : "ERROR: " . $res->status_line() . "\n";
     }
+
+    return $res->is_success();
 }
-
-GetOptions(
-    \%options,
-    'help|h',
-    'directory|d=s',
-    'file|f=s',
-    'url|u=s',
-    'useragent=s',
-    'remove|r',
-    'verbose|v',
-    'stdin',
-);
-
-$OUTPUT_AUTOFLUSH = 1;
-pod2usage() if $options{help};
-
-if ($options{file}) {
-    die "file $options{file} does not exist" unless -f $options{file};
-    loadfile($options{file});
-} elsif ($options{stdin}) {
-    loadstdin();
-} elsif ($options{directory}) {
-    die "directory $options{directory} does not exist" unless -d $options{directory};
-   loaddirectory($options{directory});
-} else {
-    pod2usage();
-}
-
-exit(0);
 
 __END__
 
@@ -125,7 +125,7 @@ fusioninventory-injector - A tool to push inventory in an OCS Inventory or compa
 
 =head1 SYNOPSIS
 
-fusioninventory-injector [options] [--file <file>|--directory <directory|--stdin]
+fusioninventory-injector [options] [--file <file>|--directory <directory>|--stdin]
 
   Options:
     -h --help      this menu
