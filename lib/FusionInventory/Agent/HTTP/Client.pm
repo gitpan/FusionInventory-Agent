@@ -60,9 +60,9 @@ sub request {
 
     my $url = $request->uri();
     my $scheme = $url->scheme();
-    $self->_setSSLOptions() if $scheme eq 'https' && !$self->{ssl_set}; 
+    $self->_setSSLOptions() if $scheme eq 'https' && !$self->{ssl_set};
 
-    my $result;
+    my $result = HTTP::Response->new( 500 );
     eval {
         if ($OSNAME eq 'MSWin32' && $scheme eq 'https') {
             alarm $self->{timeout};
@@ -145,6 +145,10 @@ sub _setSSLOptions {
             "You can use 'no-ssl-check' option to disable it."
             if $EVAL_ERROR;
 
+        if ($self->{logger}{debug} >= 3) {
+            $Net::SSLeay::trace = 2;
+        }
+
         if ($LWP::VERSION >= 6) {
             $self->{ua}->ssl_opts(SSL_ca_file => $self->{ca_cert_file})
                 if $self->{ca_cert_file};
@@ -152,7 +156,7 @@ sub _setSSLOptions {
                 if $self->{ca_cert_dir};
         } else {
             # SSL_verifycn_scheme and SSL_verifycn_name are required
-            die 
+            die
                 "IO::Socket::SSL $IO::Socket::SSL::VERSION is too old, "     .
                 "version 1.14 is required for SSL certificate validation.\n" .
                 " You can use 'no-ssl-check' option to disable SSL it."
@@ -163,7 +167,7 @@ sub _setSSLOptions {
                 ca_cert_file => $self->{ca_cert_file},
                 ca_cert_dir  => $self->{ca_cert_dir},
             );
-            die 
+            die
                 "failed to load FusionInventory::Agent::HTTP::Protocol::https" .
                 ", unable to perform SSL certificate validation.\n"            .
                 "You can use 'no-ssl-check' option to disable it."

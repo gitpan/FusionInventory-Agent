@@ -9,7 +9,7 @@ use English qw(-no_match_vars);
 use UNIVERSAL::require;
 
 use FusionInventory::Agent::Tools;
-use FusionInventory::Agent::Task::Inventory::Inventory;
+use FusionInventory::Agent::Inventory;
 use FusionInventory::Agent::XML::Query::Inventory;
 
 our $VERSION = '1.0';
@@ -43,16 +43,11 @@ sub run {
 
     $self->{modules} = {};
 
-    my $inventory = FusionInventory::Agent::Task::Inventory::Inventory->new(
-        deviceid => $self->{deviceid},
+    my $inventory = FusionInventory::Agent::Inventory->new(
         statedir => $self->{target}->getStorage()->getDirectory(),
         logger   => $self->{logger},
         tag      => $self->{config}->{'tag'}
     );
-
-    # Turn off localised output for commands
-    $ENV{LC_ALL} = 'C'; # Turn off localised output for commands
-    $ENV{LANG} = 'C'; # Turn off localised output for commands
 
     if (not $self->{config}->{'scan-homedirs'}) {
         $self->{logger}->debug(
@@ -74,33 +69,48 @@ sub run {
     $self->_initModulesList(\%disabled);
     $self->_feedInventory($inventory, \%disabled);
 
-    if ($self->{target}->isa('FusionInventory::Agent::Target::Stdout')) {
+    if ($self->{target}->isa('FusionInventory::Agent::Target::Local')) {
+        my $path   = $self->{target}->getPath();
+        my $format = $self->{target}->{format};
+        my ($file, $handle);
+
+        SWITCH: {
+            if ($path eq '-') {
+                $handle = \*STDOUT;
+                last SWITCH;
+            }
+
+            if (-d $path) {
+                $file =
+                    $path . "/" . $self->{deviceid} .
+                    ($format eq 'xml' ? '.ocs' : '.html');
+                last SWITCH;
+            }
+
+            $file = $path;
+        }
+
+        if ($file) {
+            if (Win32::Unicode::File->require()) {
+                $handle = Win32::Unicode::File->new('w', $file);
+            } else {
+                open($handle, '>', $file);
+            }
+            $self->{logger}->error("Can't write to $file: $ERRNO")
+                unless $handle;
+        }
+
         $self->_printInventory(
             inventory => $inventory,
-            handle    => \*STDOUT,
-            format    => 'xml'
+            handle    => $handle,
+            format    => $format
         );
-    } elsif ($self->{target}->isa('FusionInventory::Agent::Target::Local')) {
-        my $format = $self->{target}->{format};
 
-        my $extension = $format eq 'xml' ? '.ocs' : '.html';
-        my $file =
-            $self->{config}->{local} .
-            "/" .
-            $self->{deviceid} .
-            $extension;
-
-        if (open my $handle, '>', $file) {
-            $self->_printInventory(
-                inventory => $inventory,
-                handle    => $handle,
-                format    => $format
-            );
-            close $handle;
+        if ($file) {
             $self->{logger}->info("Inventory saved in $file");
-        } else {
-            $self->{logger}->error("Can't write to $file: $ERRNO");
+            close $handle;
         }
+
     } elsif ($self->{target}->isa('FusionInventory::Agent::Target::Server')) {
         my $client = FusionInventory::Agent::HTTP::Client::OCS->new(
             logger       => $self->{logger},
@@ -135,19 +145,19 @@ sub _initModulesList {
     my $logger = $self->{logger};
     my $config = $self->{config};
 
-    my @modules = __PACKAGE__->getModules('Input');
+    my @modules = __PACKAGE__->getModules('');
     die "no inventory module found" if !@modules;
 
     # first pass: compute all relevant modules
     foreach my $module (sort @modules) {
         # compute parent module:
         my @components = split('::', $module);
-        my $parent = @components > 6 ?
+        my $parent = @components > 5 ?
             join('::', @components[0 .. $#components -1]) : '';
 
         # skip if parent is not allowed
         if ($parent && !$self->{modules}->{$parent}->{enabled}) {
-            $logger->debug("  $module disabled: implicit dependency $parent not enabled");
+            $logger->debug2("  $module disabled: implicit dependency $parent not enabled");
             $self->{modules}->{$module}->{enabled} = 0;
             next;
         }
@@ -173,7 +183,7 @@ sub _initModulesList {
             }
         );
         if (!$enabled) {
-            $logger->debug("module $module disabled");
+            $logger->debug2("module $module disabled");
             $self->{modules}->{$module}->{enabled} = 0;
             next;
         }
@@ -183,7 +193,7 @@ sub _initModulesList {
         $self->{modules}->{$module}->{used}    = 0;
 
         no strict 'refs'; ## no critic (ProhibitNoStrict)
-        $self->{modules}->{$module}->{runAfter} = [ 
+        $self->{modules}->{$module}->{runAfter} = [
             $parent ? $parent : (),
             ${$module . '::runAfter'} ? @${$module . '::runAfter'} : ()
         ];
@@ -196,7 +206,7 @@ sub _initModulesList {
 
         # skip modules already disabled
         next unless $self->{modules}->{$module}->{enabled};
-        # skip non-fallback modules 
+        # skip non-fallback modules
         next unless ${$module . '::runMeIfTheseChecksFailed'};
 
         my $failed;
@@ -259,7 +269,7 @@ sub _runModule {
 }
 
 sub _feedInventory {
-    my ($self, $inventory) = @_;
+    my ($self, $inventory, $disabled) = @_;
 
     my $begin = time();
     my @modules =
@@ -267,7 +277,7 @@ sub _feedInventory {
         keys %{$self->{modules}};
 
     foreach my $module (sort @modules) {
-        $self->_runModule($module, $inventory);
+        $self->_runModule($module, $inventory, $disabled);
     }
 
     if (-d $self->{confdir} . '/softwares') {
@@ -362,7 +372,7 @@ __END__
 
 =head1 NAME
 
-FusionInventory::Agent::Task::Inventory - Inventory task for FusionInventory 
+FusionInventory::Agent::Task::Inventory - Inventory task for FusionInventory
 
 =head1 DESCRIPTION
 

@@ -5,23 +5,17 @@ use warnings;
 
 use English qw(-no_match_vars);
 use Test::More;
+use UNIVERSAL::require;
 
-use lib 't';
-
-eval {
-    require Test::Compile;
-    Test::Compile->import();
-};
-if ($EVAL_ERROR) {
-    my $msg = 'Test::Compile required';
-    plan(skip_all => $msg);
-}
+plan(skip_all => 'Test::Compile required')
+    unless Test::Compile->require();
+Test::Compile->import();
 
 # use mock modules for non-available ones
 if ($OSNAME eq 'MSWin32') {
-    push @INC, 't/fake/unix';
+    push @INC, 't/lib/fake/unix';
 } else {
-    push @INC, 't/fake/windows';
+    push @INC, 't/lib/fake/windows';
 }
 
 # exclude linked modules
@@ -31,8 +25,9 @@ all_pm_files_ok(@files);
 
 # filename-based filter
 sub filter {
-    return 0 if $_ =~ m{FusionInventory/VMware};
-    return 1 if $_ =~ m{FusionInventory/Agent/Task/(Inventory|WakeOnLan)};
-    return 0 if $_ =~ m{FusionInventory/Agent/Task};
+# TODO: not required since the tasks merge
+#    return 0 if $_ =~ m{FusionInventory/VMware};
+#    return 1 if $_ =~ m{FusionInventory/Agent/Task/(Inventory|WakeOnLan)};
+#    return 0 if $_ =~ m{FusionInventory/Agent/Task};
     return 1;
 }

@@ -17,7 +17,7 @@ our @EXPORT = qw(
     getDirectoryHandle
     getFileHandle
     getFormatedLocalTime
-    getFormatedGmTime
+    getFormatedGMTTime
     getFormatedDate
     getCanonicalManufacturer
     getCanonicalSpeed
@@ -43,6 +43,7 @@ our @EXPORT = qw(
     module2file
     runFunction
     delay
+    slurp
 );
 
 my $nowhere = $OSNAME eq 'MSWin32' ? 'nul' : '/dev/null';
@@ -57,6 +58,8 @@ if ($OSNAME ne 'MSWin32') {
 sub getFormatedLocalTime {
     my ($time) = @_;
 
+    return unless $time;
+
     my ($year, $month , $day, $hour, $min, $sec) =
         (localtime ($time))[5, 4, 3, 2, 1, 0];
 
@@ -65,7 +68,7 @@ sub getFormatedLocalTime {
     );
 }
 
-sub getFormatedGmTime {
+sub getFormatedGMTTime {
     my ($time) = @_;
 
     my ($year, $month , $day, $hour, $min, $sec) =
@@ -185,7 +188,7 @@ sub getSanitizedString {
     $string =~ s/[[:cntrl:]]//g;
 
     # encode to utf-8 if needed
-    if ($string !~ m/\A(
+    if (!Encode::is_utf8($string) && $string !~ m/\A(
           [\x09\x0A\x0D\x20-\x7E]           # ASCII
         | [\xC2-\xDF][\x80-\xBF]            # non-overlong 2-byte
         | \xE0[\xA0-\xBF][\x80-\xBF]        # excluding overlongs
@@ -233,6 +236,9 @@ sub getFileHandle {
             last SWITCH;
         }
         if ($params{command}) {
+            # Turn off localised output for commands
+            local $ENV{LC_ALL} = 'C';
+            local $ENV{LANG} = 'C';
             if (!open $handle, '-|', $params{command} . " 2>$nowhere") {
                 $params{logger}->error(
                     "Can't run command $params{command}: $ERRNO"
@@ -241,10 +247,10 @@ sub getFileHandle {
             }
             last SWITCH;
         }
-	if ($params{string}) {
-	    open $handle, "<", \$params{string} or die;
+        if ($params{string}) {
+            open $handle, "<", \$params{string} or die;
             last SWITCH;
-	}
+        }
         die "neither command, file or string parameter given";
     }
 
@@ -453,8 +459,8 @@ sub runFunction {
         $result = &{$params{module} . '::' . $params{function}}(
             ref $params{params} eq 'HASH'  ? %{$params{params}} :
             ref $params{params} eq 'ARRAY' ? @{$params{params}} :
-                                               $params{params} 
-	);
+                                               $params{params}
+        );
         alarm 0;
     };
 
@@ -479,6 +485,16 @@ sub delay {
     }
 }
 
+sub slurp {
+    my($file) = @_;
+
+    my $handler;
+    return unless open $handler, '<', $file;
+    local $INPUT_RECORD_SEPARATOR; # Set input to "slurp" mode.
+    my $content = <$handler>;
+    close $handler;
+    return $content;
+}
 
 1;
 __END__
@@ -497,7 +513,7 @@ This module provides some OS-independant generic functions.
 
 Returns a formated date from given Unix timestamp.
 
-=head2 getFormatedGmTime($time)
+=head2 getFormatedGMTTime($time)
 
 Returns a formated date from given Unix timestamp.
 
@@ -707,3 +723,7 @@ Run a function whose name is computed at runtime and return its result.
 
 Wait for $second. It uses sleep() or Win32::Sleep() depending
 on the Operating System.
+
+=head2 slurp($file)
+
+Return the content of a given file.

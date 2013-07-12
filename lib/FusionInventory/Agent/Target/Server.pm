@@ -59,10 +59,16 @@ sub getUrl {
     return $self->{url};
 }
 
-sub getDescription {
+sub _getName {
     my ($self) = @_;
 
-    return "server, $self->{url}";
+    return $self->{url};
+}
+
+sub _getType {
+    my ($self) = @_;
+
+    return 'server';
 }
 
 1;
@@ -96,4 +102,3 @@ the server URL (mandatory)
 =head2 getUrl()
 
 Return the server URL for this target.
-

@@ -2,16 +2,21 @@ package FusionInventory::Agent::HTTP::Server;
 
 use strict;
 use warnings;
-use threads;
-use threads::shared;
 
 use English qw(-no_match_vars);
-use HTTP::Daemon;
-use Net::IP;
-use Text::Template;
 use File::Basename;
+use HTTP::Daemon;
+use IO::Handle;
+use Net::IP;
+use Socket qw( SOCK_STREAM );
+use Socket::GetAddrInfo qw( getaddrinfo getnameinfo );
+use IO::Socket;
+#use Socket::GetAddrInfo qw( getaddrinfo getnameinfo );
+use Text::Template;
+use File::Glob;
 
 use FusionInventory::Agent::Logger;
+use FusionInventory::Agent::Tools::Network;
 
 my $log_prefix = "[http server] ";
 
@@ -22,25 +27,59 @@ sub new {
         logger    => $params{logger} ||
                      FusionInventory::Agent::Logger->new(),
         agent     => $params{agent},
-        scheduler => $params{scheduler},
         htmldir   => $params{htmldir},
         ip        => $params{ip},
         port      => $params{port} || 62354,
-        trust     => $params{trust}
     };
     bless $self, $class;
 
-    $self->{stop} = 0;
-    my $stop = \$self->{stop};
-    threads::shared::share($stop);
-    $self->{listener} = threads->create('_listen', $self);
+    $self->{trust} = $self->_parseAddresses($params{trust})
+        if $params{trust};
 
     return $self;
 }
 
+sub _parseAddresses {
+    my ($self, $strings) = @_;
+
+    return unless $strings;
+
+    my @addresses;
+
+    foreach my $string (@$strings) {
+
+        # push ip addresses directly in the list
+        if ($string =~ /^$ip_address_pattern/) {
+            push @addresses, Net::IP->new($string);
+            next;
+        }
+
+        # resolve host names
+        my ($error, @results) = getaddrinfo(
+            $string, "", { socktype => SOCK_RAW }
+        );
+        if ($error) {
+            $self->{logger}->error("unable to resolve $string: $error");
+            next;
+        }
+
+        # and push all of their addresses in the list
+        foreach my $result (@results) {
+            my ($error, $host) = getnameinfo($result->{addr}, Socket::GetAddrInfo::NI_NUMERICHOST, Socket::GetAddrInfo::NIx_NOSERV);
+            if ($error) {
+                $self->{logger}->error("unable to get host address: $error");
+                next;
+            }
+            push @addresses, Net::IP->new($host);
+        }
+    }
+
+    return \@addresses;
+}
+
 sub _handle {
     my ($self, $client, $request, $clientIp) = @_;
-    
+
     my $logger = $self->{logger};
 
     if (!$request) {
@@ -67,7 +106,7 @@ sub _handle {
         if ($path eq '/') {
             $self->_handle_root($client, $request, $clientIp);
             last SWITCH;
-        } 
+        }
 
         # deploy request
         if ($path =~ m{^/deploy/getFile/./../([\w\d/-]+)$}) {
@@ -124,13 +163,22 @@ sub _handle_root {
         return;
     }
 
+    my @server_targets =
+        map { { name => $_->getUrl(), date => $_->getFormatedNextRunDate() } }
+        grep { $_->isa('FusionInventory::Agent::Target::Server') }
+        $self->{agent}->getTargets();
+
+    my @local_targets =
+        map { { name => $_->getPath(), date => $_->getFormatedNextRunDate() } }
+        grep { $_->isa('FusionInventory::Agent::Target::Local') }
+        $self->{agent}->getTargets();
+
     my $hash = {
-        version => $FusionInventory::Agent::VERSION,
-        trust   => $self->_is_trusted($clientIp),
-        status  => $self->{agent}->getStatus(),
-        targets => [
-            map { $_->getStatus() } $self->{scheduler}->getTargets()
-        ]
+        version        => $FusionInventory::Agent::VERSION,
+        trust          => $self->_isTrusted($clientIp),
+        status         => $self->{agent}->getStatus(),
+        server_targets => \@server_targets,
+        local_targets  => \@local_targets
     };
 
     my $response = HTTP::Response->new(
@@ -151,12 +199,11 @@ sub _handle_deploy {
     return unless $sha512 =~ /^(.)(.)(.{6})/;
     my $subFilePath = $1.'/'.$2.'/'.$3;
 
-    File::Glob->require();
     Digest::SHA->require();
 
     my $path;
-    LOOP: foreach my $target ($self->{scheduler}->getTargets()) {
-        foreach (File::Glob::glob($target->{storage}->getDirectory()."/deploy/fileparts/shared/*")) {
+    LOOP: foreach my $target ($self->{agent}->getTargets()) {
+        foreach (File::Glob::glob($target->{storage}->getDirectory() . "/deploy/fileparts/shared/*")) {
             next unless -f $_.'/'.$subFilePath;
 
             my $sha = Digest::SHA->new('512');
@@ -177,26 +224,22 @@ sub _handle_deploy {
 }
 
 sub _handle_now {
-    my ($self, $client, $request, $clientIp, $token) = @_;
+    my ($self, $client, $request, $clientIp) = @_;
 
     my $logger = $self->{logger};
 
     my ($code, $message, $trace);
-    if (
-        $self->_is_trusted($clientIp) ||
-        $self->_is_authenticated($token)
-    ) {
-        foreach my $target ($self->{scheduler}->getTargets()) {
+    if ($self->_isTrusted($clientIp)) {
+        foreach my $target ($self->{agent}->getTargets()) {
             $target->setNextRunDate(1);
         }
-        $self->{agent}->resetToken();
         $code    = 200;
         $message = "OK";
         $trace   = "valid request, forcing execution right now";
     } else {
         $code    = 403;
         $message = "Access denied";
-        $trace   = "invalid request (bad token or bad address)";
+        $trace   = "invalid request (untrusted address)";
     }
 
     my $template = Text::Template->new(
@@ -231,79 +274,76 @@ sub _handle_status {
     $client->send_response($response);
 }
 
-sub _is_trusted {
-    my ($self, $address) = @_;
+sub _isTrusted {
+    my ($self, $clientIp) = @_;
 
+    my $logger = $self->{logger};
+
+    my $source  = Net::IP->new($clientIp);
+
+    if (!$source) {
+        $logger->error("Not well formatted source IP: $clientIp");
+        return;
+    }
+
+    return 0 unless $source;
     return 0 unless $self->{trust};
 
-    my $source  = Net::IP->new($address);
-    my $trusted = Net::IP->new($self->{trust});
-    my $result = $source->overlaps($trusted);
+    foreach my $trust (@{$self->{trust}}) {
+        my $result = $source->overlaps($trust);
 
-    return 
-        $result == $IP_A_IN_B_OVERLAP || # included in trusted range
-        $result == $IP_IDENTICAL;        # equals trusted address
+        if (!$result && Net::IP::Error()) {
+            $logger->debug("Server: ".Net::IP::Error());
+            next;
+        }
+
+        # included in trusted range
+        return 1 if $result == $IP_A_IN_B_OVERLAP;
+
+        # equals trusted address
+        return 1 if $result == $IP_IDENTICAL;
+
+    }
+
+    return 0;
 }
 
-sub _is_authenticated {
-    my ($self, $token) = @_;
-
-    return 0 unless $token;
-
-    return $token eq $self->{agent}->getToken();
-}
-
-sub _listen {
+sub init {
     my ($self) = @_;
 
     my $logger = $self->{logger};
 
-    my $daemon = HTTP::Daemon->new(
+    $self->{listener} = HTTP::Daemon->new(
         LocalAddr => $self->{ip},
         LocalPort => $self->{port},
         Reuse     => 1,
         Timeout   => 5
     );
-  
-    if (!$daemon) {
+
+    if (!$self->{listener}) {
         $logger->error($log_prefix . "failed to start the HTTPD service");
         return;
-    } 
+    }
 
     my $url = $self->{ip} ?
         "http://$self->{ip}:$self->{port}" :
         "http://localhost:$self->{port}" ;
 
     $logger->info($log_prefix . "HTTPD service started at $url");
-
-    while (1) {
-        my ($client, $socket) = $daemon->accept();
-        last if $self->{stop};
-        next unless $socket;
-        my (undef, $iaddr) = sockaddr_in($socket);
-        my $clientIp = inet_ntoa($iaddr);
-        my $request = $client->get_request();
-        $self->_handle($client, $request, $clientIp);
-    }
 }
 
-sub terminate {
+sub handleRequests {
     my ($self) = @_;
 
-    lock $self->{stop};
-    $self->{stop} = 1;
-}
+    return unless $self->{listener}; # init() call failed
 
-sub DESTROY {
-    my ($self) = @_;
+    my ($client, $socket) = $self->{listener}->accept();
+    return unless $socket;
 
-    return unless $self->{listener};
-
-    if ($self->{listener}->is_joinable()) {
-        $self->{listener}->join();
-    } elsif (!$self->{listener}->is_detached()) {
-        $self->{listener}->detach();
-    }
+    my (undef, $iaddr) = sockaddr_in($socket);
+    my $clientIp = inet_ntoa($iaddr);
+    my $request = $client->get_request();
+    $self->_handle($client, $request, $clientIp);
 }
 
 1;
@@ -331,9 +371,8 @@ requests are accepted:
 
 =back
 
-Authentication is based on a token created by the agent, and sent to the
-server at initial connection. Connection from addresses matching the trust
-parameter are trusted without token.
+Authentication is based on connection source address: trusted requests are
+accepted, other are rejected.
 
 =head1 METHODS
 
@@ -347,14 +386,6 @@ hash:
 =item I<logger>
 
 the logger object to use
-
-=item I<scheduler>
-
-the scheduler object to use
-
-=item I<agent>
-
-the agent object
 
 =item I<htmldir>
 
@@ -371,7 +402,7 @@ the network port to listen to
 =item I<trust>
 
 an IP address or an IP address range from which to trust incoming requests
-without authentication token (default: none)
+(default: none)
 
 =back
 

@@ -27,23 +27,27 @@ sub addMessage {
     my $level = $params{level};
     my $message = $params{message};
 
+    my $handle;
     if ($self->{logfile_maxsize}) {
         my $stat = stat($self->{logfile});
         if ($stat && $stat->size() > $self->{logfile_maxsize}) {
-            unlink $self->{logfile}
-                or warn "Can't unlink $self->{logfile}: $ERRNO";
+            if (!open $handle, '>', $self->{logfile}) {
+                warn "Can't open $self->{logfile}: $ERRNO";
+                return;
+            }
         }
     }
 
-    my $handle;
-    if (!open $handle, '>>', $self->{logfile}) {
-        die "can't open $self->{logfile}: $ERRNO";
+    if (!$handle && !open $handle, '>>', $self->{logfile}) {
+        warn "can't open $self->{logfile}: $ERRNO";
+        return;
     }
 
     my $locked;
     my $retryTill = time + 60;
 
     while ($retryTill > time && !$locked) {
+        ## no critic (ProhibitBitwise)
         # get an exclusive lock on log file
         $locked = 1 if flock($handle, LOCK_EX|LOCK_NB);
     }

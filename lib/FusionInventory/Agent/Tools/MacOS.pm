@@ -17,11 +17,11 @@ our @EXPORT = qw(
 memoize('getSystemProfilerInfos');
 
 sub getSystemProfilerInfos {
-    my (%params) = (
-        command => '/usr/sbin/system_profiler',
-        @_
-    );
-    my $handle = getFileHandle(%params);
+    my (%params) = @_;
+
+    my $command = $params{type} ?
+        "/usr/sbin/system_profiler $params{type}" : "/usr/sbin/system_profiler";
+    my $handle = getFileHandle(command => $command, %params);
 
     my $info = {};
 
@@ -35,7 +35,7 @@ sub getSystemProfilerInfos {
         my $level = defined $1 ? length($1) : 0;
         my $key = $2;
         my $value = $3;
-        
+
         my $parent = $parents[-1];
         my $parent_level = $parent->[1];
         my $parent_node  = $parent->[0];
@@ -103,7 +103,7 @@ sub getIODevices {
     my $handle = getFileHandle(command => $command, %params);
     return unless $handle;
 
-    my @devices;  
+    my @devices;
     my $device;
 
 
