@@ -1,4 +1,4 @@
-package FusionInventory::Agent::Manufacturer;
+package FusionInventory::Agent::Tools::Hardware::Generic;
 
 use strict;
 use warnings;
@@ -13,7 +13,8 @@ sub setConnectedDevicesMacAddresses {
     my $ports   = $params{ports};
     my $walks   = $params{walks};
 
-    while (my ($oid, $mac) = each %{$results->{dot1dTpFdbAddress}}) {
+    foreach my $oid (sort keys %{$results->{dot1dTpFdbAddress}}) {
+        my $mac = $results->{dot1dTpFdbAddress}->{$oid};
         $mac = alt2canonical($mac);
         next unless $mac;
 
@@ -95,7 +96,7 @@ sub setConnectedDevicesUsingCDP {
 
         next if !$connection->{SYSDESCR} || !$connection->{MODEL};
 
-        $ports->{getNextToLastElement($oid)}->{CONNECTIONS} = {
+        $ports->{getElement($oid, -2)}->{CONNECTIONS} = {
             CDP        => 1,
             CONNECTION => $connection
         };
@@ -116,7 +117,7 @@ sub setConnectedDevicesUsingLLDP {
             getElement($oid, -2) . "." .
             getElement($oid, -1);
 
-        $ports->{getNextToLastElement($oid)}->{CONNECTIONS} = {
+        $ports->{getElement($oid, -2)}->{CONNECTIONS} = {
             CDP        => 1,
             CONNECTION => {
                 SYSMAC => alt2canonical($mac),
@@ -153,11 +154,11 @@ __END__
 
 =head1 NAME
 
-FusionInventory::Agent::Manufacturer - Manufacturer-specific functions
+FusionInventory::Agent::Tools::Hardware::Generic - Generic hardware-relatedfunctions
 
 =head1 DESCRIPTION
 
-This module provides some manufacturer-specific functions.
+This module provides some generic implementation of hardware-related functions.
 
 =head1 FUNCTIONS
 

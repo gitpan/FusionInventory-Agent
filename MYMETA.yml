@@ -3,6 +3,7 @@ abstract: 'FusionInventory unified Agent for UNIX, Linux, Windows and MacOSX'
 author:
   - unknown
 build_requires:
+  Clone: 0
   ExtUtils::MakeMaker: 6.59
   HTTP::Proxy: 0
   HTTP::Server::Simple: 0
@@ -10,18 +11,22 @@ build_requires:
   IO::Capture::Stderr: 0
   IO::Socket::SSL: 0
   IPC::Run: 0
+  JSON: 0
   LWP::Protocol::https: 0
+  Net::SNMP: 0
   POE::Component::Client::Ping: 0
   Test::Compile: 0
   Test::Deep: 0
   Test::Exception: 0
   Test::HTTP::Server::Simple: 0
   Test::MockModule: 0
+  Test::MockObject: 0
   Test::More: 0.93
+  Test::NoWarnings: 0
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 0
-generated_by: 'ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.112621'
+generated_by: 'ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.131560'
 license: open_source
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -40,4 +45,4 @@ requires:
   UNIVERSAL::require: 0
   XML::TreePP: 0.26
   perl: 5.008
-version: v2.2.9901
+version: v2.2.9902

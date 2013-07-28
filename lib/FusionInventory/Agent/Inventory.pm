@@ -18,7 +18,7 @@ my %fields = (
     CONTROLLERS => [ qw/CAPTION DRIVER NAME MANUFACTURER PCICLASS VENDORID
                         PRODUCTID PCISUBSYSTEMID PCISLOT TYPE REV/ ],
     CPUS        => [ qw/CACHE CORE DESCRIPTION MANUFACTURER NAME THREAD SERIAL
-                        STEPPING FAMILYNAME FAMILYNUMBER MODEL SPEED ID EXTERNAL_CLOCK/ ],
+                        STEPPING FAMILYNAME FAMILYNUMBER MODEL SPEED ID EXTERNAL_CLOCK ARCH/ ],
     DRIVES      => [ qw/CREATEDATE DESCRIPTION FREE FILESYSTEM LABEL LETTER
                         SERIAL SYSTEMDRIVE TOTAL TYPE VOLUMN/ ],
     ENVS        => [ qw/KEY VAL/ ],
@@ -88,10 +88,16 @@ my %checks = (
         INTERFACE => qr/^(SCSI|HDC|IDE|USB|1394|Serial-ATA|SAS)$/
     },
     VIRTUALMACHINES => {
-        STATUS => qr/^(running|idle|paused|shutdown|crashed|dying|off)$/
+        STATUS => qr/^(running|blocked|idle|paused|shutdown|crashed|dying|off)$/
+    },
+    SLOTS => {
+        STATUS => qr/^(free|used)$/
     },
     NETWORKS => {
-        TYPE => qr/^(ethernet|wifi)$/
+        TYPE => qr/^(ethernet|wifi|aggregate|alias|dialup)$/
+    },
+    CPUS => {
+        ARCH => qr/^(MIPS|MIPS64|Alpha|SPARC|SPARC64|m68k|i386|x86_64|PowerPC|PowerPC64|ARM|AArch64)$/
     }
 );
 
@@ -669,6 +675,10 @@ Eg. 2, start at 1, not 0
 
 =over
 
+=item ARCH
+
+The CPU architecture
+
 =item CACHESIZE
 
 The total CPU cache size in KB. e.g: 3072
@@ -1011,7 +1021,8 @@ Serial, Parallel, SATA, etc
 
 =head2 SLOTS
 
-Represents physical connection points including ports, motherboard slots and peripherals, and proprietary connection points.
+Represents physical connection points including ports, motherboard slots and
+peripherals, and proprietary connection points.
 
 This information is hardly reliable.
 
@@ -1019,11 +1030,17 @@ This information is hardly reliable.
 
 =item DESCRIPTION
 
+The bus type.
+
 =item DESIGNATION
 
 =item NAME
 
+The slot identifier.
+
 =item STATUS
+
+The slot usage status (free or used).
 
 =back
 

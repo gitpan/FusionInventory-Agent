@@ -2,10 +2,14 @@
 
 use strict;
 use warnings;
+use lib 't/lib';
 
 use Test::Deep;
+use Test::Exception;
 use Test::More;
+use Test::NoWarnings;
 
+use FusionInventory::Test::Inventory;
 use FusionInventory::Agent::Task::Inventory::Virtualization::Libvirt;
 
 my %list_tests = (
@@ -104,13 +108,20 @@ my %dumpxml_tests = (
 
 
 plan tests =>
-    (scalar keys %list_tests)   +
-    (scalar keys %dumpxml_tests);
+    (2 * scalar keys %list_tests) +
+    (scalar keys %dumpxml_tests)  +
+    1;
+
+my $inventory = FusionInventory::Test::Inventory->new();
 
 foreach my $test (keys %list_tests) {
     my $file = "resources/virtualization/virsh/$test";
     my @machines = FusionInventory::Agent::Task::Inventory::Virtualization::Libvirt::_parseList(file => $file);
     cmp_deeply(\@machines, $list_tests{$test}, "virst list parsing: $test");
+    lives_ok {
+        $inventory->addEntry(section => 'VIRTUALMACHINES', entry => $_)
+            foreach @machines;
+    } "$test: registering";
 }
 
 foreach my $test (keys %dumpxml_tests) {

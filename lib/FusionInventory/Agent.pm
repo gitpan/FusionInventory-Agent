@@ -21,7 +21,7 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Hostname;
 use FusionInventory::Agent::XML::Query::Prolog;
 
-our $VERSION = '2.2.9901';
+our $VERSION = '2.2.9902';
 our $VERSION_STRING = versionString($VERSION);
 our $AGENT_STRING = "FusionInventory-Agent_v$VERSION";
 
@@ -210,6 +210,7 @@ sub run {
 
             # check for http interface messages
             $self->{server}->handleRequests() if $self->{server};
+            delay(1);
         }
     } else {
         # foreground mode: check each targets once

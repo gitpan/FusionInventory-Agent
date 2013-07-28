@@ -67,10 +67,11 @@ sub _readSymbolicOids {
         'HOST-RESOURCES-MIB::hrDeviceDescr' => '.1.3.6.1.2.1.25.3.2.1.3',
     );
 
+    binmode($handle);
     my $values;
     while (my $line = <$handle>) {
        # Get multi-line block
-       while ($line =~ /\r\n$/) {
+       while (!eof($handle) && $line =~ /\r\n$/) {
            $line .= <$handle>;
        }
        next unless $line =~ /^([^.]+) \. ([\d.]+) \s = \s (\S+): \s (.*)/sx;

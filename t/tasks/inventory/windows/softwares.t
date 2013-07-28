@@ -8,9 +8,12 @@ use lib 't/lib';
 use Encode;
 use English qw(-no_match_vars);
 use Test::Deep;
+use Test::Exception;
 use Test::MockModule;
 use Test::More;
+use Test::NoWarnings;
 
+use FusionInventory::Agent::Inventory;
 use FusionInventory::Test::Utils;
 
 BEGIN {
@@ -18,19 +21,6 @@ BEGIN {
     push @INC, 't/lib/fake/windows' if $OSNAME ne 'MSWin32';
 }
 
-sub sort_result {
-    my ($before) = @_;
-
-    my @after = sort {
-        $a->{NAME} cmp $b->{NAME}
-            or
-        $a->{GUID} cmp $b->{GUID}
-            or
-        $a->{PUBLISHER} cmp $b->{PUBLISHER}
-    } @$before;
-
-    return \@after;
-}
 
 use FusionInventory::Agent::Task::Inventory::Win32::Softwares;
 
@@ -8190,8 +8180,11 @@ my %hotfixes_tests = (
 );
 
 plan tests =>
-    scalar (keys %softwares_tests) +
-    scalar (keys %hotfixes_tests)  ;
+    scalar (2 * keys %softwares_tests) +
+    scalar (keys %hotfixes_tests)      +
+    1;
+
+my $inventory = FusionInventory::Agent::Inventory->new();
 
 my $module = Test::MockModule->new(
     'FusionInventory::Agent::Task::Inventory::Win32::Softwares'
@@ -8211,12 +8204,15 @@ foreach my $test (keys %softwares_tests) {
 
     my $softwares = FusionInventory::Agent::Task::Inventory::Win32::Softwares::_getSoftwaresList(softwares => $softwaresKey);
 
-    my @sortedExpected = sort_result($softwares_tests{$test});
     cmp_deeply(
-        sort_result($softwares),
-        sort_result($softwares_tests{$test}),
-        "$test softwares list"
+        [ sort { compare() } @$softwares ],
+        [ sort { compare() } @{$softwares_tests{$test}} ],
+        "$test: parsing"
     );
+    lives_ok {
+        $inventory->addEntry(section => 'SOFTWARES', entry => $_)
+            foreach @$softwares;
+    } "$test: registering";
 }
 
 foreach my $test (keys %hotfixes_tests) {
@@ -8231,4 +8227,11 @@ foreach my $test (keys %hotfixes_tests) {
         $hotfixes_tests{$test},
         "$test hotfixes list"
     );
+}
+
+sub compare {
+    return
+        $a->{NAME}      cmp $b->{NAME}     ||
+        $a->{GUID}      cmp $b->{GUID}     ||
+        $a->{PUBLISHER} cmp $b->{PUBLISHER};
 }
