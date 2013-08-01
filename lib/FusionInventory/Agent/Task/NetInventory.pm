@@ -333,8 +333,10 @@ sub _queryDevice {
         }
     }
 
-    my $description = $snmp->get('.1.3.6.1.2.1.1.1.0');
-    if (!$description) {
+    # first, let's retrieve basic device informations
+    my %info = getDeviceBaseInfo($snmp);
+
+    if (!%info) {
         return {
             ERROR => {
                 ID      => $device->{ID},
@@ -343,6 +345,11 @@ sub _queryDevice {
             }
         };
     }
+
+    # unfortunatly, some elements differs between discovery
+    # and inventory response
+    delete $info{DESCRIPTION};
+    delete $info{SNMPHOSTNAME};
 
     # automatically extend model for cartridge support
     if ($device->{TYPE} eq "PRINTER") {
@@ -389,11 +396,9 @@ sub _queryDevice {
         INFO => {
             ID   => $device->{ID},
             TYPE => $device->{TYPE},
-            getBasicInfoFromSysdescr($description, $snmp)
+            %info
         }
     };
-
-
 
     $self->_setGenericProperties(
         results => $results,

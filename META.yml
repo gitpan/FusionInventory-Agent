@@ -50,6 +50,7 @@ recommends:
   Net::CUPS: 0.6
   Net::NBName: 0
   Net::SNMP: 0
+  Net::Write::Layer2: 0
   POE::Component::Client::Ping: 0
   Parse::EDID: 0
   Proc::Daemon: 0
@@ -66,4 +67,4 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.2.9902
+version: 2.3.0

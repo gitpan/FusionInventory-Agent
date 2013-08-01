@@ -10,8 +10,8 @@ sub new {
     my ($class, %params) = @_;
 
     die "no file parameter" unless $params{file};
-    die "non-existing file parameter" unless -f $params{file};
-    die "unreadable file parameter" unless -r $params{file};
+    die "non-existing $params{file} file parameter" unless -f $params{file};
+    die "unreadable $params{file} file parameter" unless -r $params{file};
 
     my $self = {
         values => _getIndexedValues($params{file})
@@ -45,7 +45,11 @@ sub _readNumericalOids {
 
     my $values;
     while (my $line = <$handle>) {
-       next unless $line =~ /^(\S+) \s = \s (\S+): \s (.*)/x;
+       # Get multi-line block
+       while (!eof($handle) && $line =~ /\r\n$/) {
+           $line .= <$handle>;
+       }
+       next unless $line =~ /^(\S+) \s = \s (\S+): \s (.*)/sx;
        $values->{$1} = [ $2, $3 ];
     }
 

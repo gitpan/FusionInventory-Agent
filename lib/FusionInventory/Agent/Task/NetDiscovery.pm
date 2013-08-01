@@ -463,104 +463,27 @@ sub _scanAddressBySNMP {
             next;
         }
 
-        # SNMPv2-MIB::sysDescr.0
-        my $sysdescr = $snmp->get('.1.3.6.1.2.1.1.1.0');
+        %device = getDeviceInfo(
+            $snmp, $params{snmp_dictionary}
+        );
 
+        # no device just means invalid credentials
         $self->{logger}->debug2(
             sprintf "thread %d: scanning %s with snmp credentials %d: %s",
             threads->tid(),
             $params{ip},
             $credential->{ID},
-            $sysdescr ? 'success' : 'failure'
+            %device ? 'success' : 'failure'
         );
 
-        # no sysdescr means invalid credentials
-        next unless $sysdescr;
+        next unless %device;
 
-        # try to get a matching model from the dictionary
-        my $model = $params{snmp_dictionary}->getModel($sysdescr);
-
-        # first, we initialize with some generic information
-        %device = getBasicInfoFromSysdescr($sysdescr, $snmp);
-
-        $device{MAC} = _getMacAddress($snmp);
-
-
-        # then we use the available information from the model
-        if ($model) {
-
-            $device{SERIAL}    = _getSerial($snmp, $model);
-            $device{MAC}       = _getMacAddress($snmp, $model) ||
-                                 _getMacAddress($snmp);
-            $device{MODELSNMP}    = $model->{MODELSNMP};
-            $device{TYPE}         = $model->{TYPE} if $model->{TYPE};
-            $device{MANUFACTURER} = $model->{MANUFACTURER} if $model->{MANUFACTURER};
-            $device{FIRMWARE}     = $model->{FIRMWARE};
-            $device{MODEL}        = $model->{MODEL};
-
-        }
-
-        $device{AUTHSNMP}     = $credential->{ID};
-        # SNMPv2-MIB::sysName.0
-        $device{SNMPHOSTNAME} = $snmp->get('.1.3.6.1.2.1.1.5.0');
-        $device{DESCRIPTION}  = $sysdescr if !$device{DESCRIPTION};
+        $device{AUTHSNMP} = $credential->{ID};
 
         last;
     }
 
     return %device;
-}
-
-sub _getSerial {
-    my ($snmp, $model) = @_;
-
-    # the model is mandatory for the serial number
-    return unless $model;
-    return unless $model->{SERIAL};
-
-    return $snmp->getSerialNumber($model->{SERIAL});
-}
-
-sub _getMacAddress {
-    my ($snmp, $model) = @_;
-
-    my $macAddress;
-
-    if ($model) {
-        # use model-specific oids
-
-        if ($model->{MAC}) {
-            $macAddress = $snmp->getMacAddress($model->{MAC});
-        }
-
-        if (!$macAddress || $macAddress !~ /^$mac_address_pattern$/) {
-            my $macs = $snmp->walkMacAddresses($model->{MACDYN});
-            foreach my $value (values %{$macs}) {
-                next if !$value;
-                next if $value eq '0:0:0:0:0:0';
-                next if $value eq '00:00:00:00:00:00';
-                $macAddress = $value;
-            }
-        }
-    } else {
-        # use default oids
-
-        # SNMPv2-SMI::mib-2.17.1.1.0
-        $macAddress = $snmp->getMacAddress(".1.3.6.1.2.1.17.1.1.0");
-
-        if (!$macAddress || $macAddress !~ /^$mac_address_pattern$/) {
-            # IF-MIB::ifPhysAddress
-            my $macs = $snmp->walkMacAddresses(".1.3.6.1.2.1.2.2.1.6");
-            foreach my $value (values %{$macs}) {
-                next if !$value;
-                next if $value eq '0:0:0:0:0:0';
-                next if $value eq '00:00:00:00:00:00';
-                $macAddress = $value;
-            }
-        }
-    }
-
-    return $macAddress;
 }
 
 sub _parseNmap {

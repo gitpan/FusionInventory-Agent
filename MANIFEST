@@ -448,6 +448,7 @@ resources/bsd/storages/mfiutil
 resources/config/sample1
 resources/config/sample2
 resources/config/sample3
+resources/dictionary.xml
 resources/esx-4.1.0-1/Login.soap
 resources/esx-4.1.0-1/RetrieveProperties-VM-16.soap
 resources/esx-4.1.0-1/RetrieveProperties-VM-32.soap
@@ -977,6 +978,15 @@ t/tasks/deploy/diskfree.t
 t/tasks/deploy/file.t
 t/tasks/deploy/p2p.t
 t/tasks/deploy/validate.t
+t/tasks/discovery/canon.t
+t/tasks/discovery/cisco.t
+t/tasks/discovery/epson.t
+t/tasks/discovery/hewlett-packard.t
+t/tasks/discovery/juniper.t
+t/tasks/discovery/kyocera.t
+t/tasks/discovery/lexmark.t
+t/tasks/discovery/ricoh.t
+t/tasks/discovery/xerox.t
 t/tasks/inventory/aix/controllers.t
 t/tasks/inventory/aix/memory.t
 t/tasks/inventory/aix/modems.t
