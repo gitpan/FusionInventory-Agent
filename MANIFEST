@@ -13,6 +13,7 @@ Changes.network
 contrib/FusionInventory.adml
 contrib/FusionInventory.admx
 contrib/Tarballs.pm
+contrib/windows/fusioninventory-agent-deployment.vbs
 contrib/yum-plugin/fusioninventory-agent.conf
 contrib/yum-plugin/fusioninventory-agent.py
 contrib/yum-plugin/INSTALL
@@ -247,10 +248,8 @@ lib/FusionInventory/Agent/Tools/Hardware.pm
 lib/FusionInventory/Agent/Tools/Hardware/3Com.pm
 lib/FusionInventory/Agent/Tools/Hardware/Alcatel.pm
 lib/FusionInventory/Agent/Tools/Hardware/Axis.pm
-lib/FusionInventory/Agent/Tools/Hardware/Cisco.pm
 lib/FusionInventory/Agent/Tools/Hardware/Generic.pm
 lib/FusionInventory/Agent/Tools/Hardware/HewlettPackard.pm
-lib/FusionInventory/Agent/Tools/Hardware/Juniper.pm
 lib/FusionInventory/Agent/Tools/Hardware/Kyocera.pm
 lib/FusionInventory/Agent/Tools/Hardware/Nortel.pm
 lib/FusionInventory/Agent/Tools/Hardware/Wyse.pm
@@ -260,7 +259,6 @@ lib/FusionInventory/Agent/Tools/HPUX.pm
 lib/FusionInventory/Agent/Tools/Linux.pm
 lib/FusionInventory/Agent/Tools/MacOS.pm
 lib/FusionInventory/Agent/Tools/Network.pm
-lib/FusionInventory/Agent/Tools/SNMP.pm
 lib/FusionInventory/Agent/Tools/Solaris.pm
 lib/FusionInventory/Agent/Tools/Unix.pm
 lib/FusionInventory/Agent/Tools/Win32.pm
@@ -448,7 +446,6 @@ resources/bsd/storages/mfiutil
 resources/config/sample1
 resources/config/sample2
 resources/config/sample3
-resources/dictionary.xml
 resources/esx-4.1.0-1/Login.soap
 resources/esx-4.1.0-1/RetrieveProperties-VM-16.soap
 resources/esx-4.1.0-1/RetrieveProperties-VM-32.soap
@@ -853,6 +850,7 @@ resources/virtualization/vboxmanage/sample3
 resources/virtualization/virsh/dumpxml1
 resources/virtualization/virsh/dumpxml2
 resources/virtualization/virsh/dumpxml3
+resources/virtualization/virsh/dumpxml4
 resources/virtualization/virsh/list1
 resources/virtualization/virsh/list2
 resources/virtualization/xm/xm_list
@@ -870,6 +868,10 @@ resources/win32/registry/7-CentralProcessor.reg
 resources/win32/registry/7-Network.reg
 resources/win32/registry/7-USB.reg
 resources/win32/registry/7-USBPRINT.reg
+resources/win32/registry/7bis-USB.reg
+resources/win32/registry/7bis-USBPRINT.reg
+resources/win32/registry/7ter-USB.reg
+resources/win32/registry/7ter-USBPRINT.reg
 resources/win32/registry/xp-CentralProcessor.reg
 resources/win32/registry/xp-uninstall.reg
 resources/win32/registry/xppro1-USB.reg
@@ -888,6 +890,10 @@ resources/win32/wmi/7-Win32_NetworkAdapterConfiguration.wmi
 resources/win32/wmi/7-Win32_PhysicalMemory.wmi
 resources/win32/wmi/7-Win32_PhysicalMemoryArray.wmi
 resources/win32/wmi/7-Win32_Processor.wmi
+resources/win32/wmi/win7-sp1-x64-Win32_LogicalDisk.wmi
+resources/win32/wmi/win7-sp1-x64-Win32_OperatingSystem.wmi
+resources/win32/wmi/winxp-sp3-x86-Win32_LogicalDisk.wmi
+resources/win32/wmi/winxp-sp3-x86-Win32_OperatingSystem.wmi
 resources/win32/wmi/xp-Win32_NetworkAdapter.wmi
 resources/win32/wmi/xp-Win32_NetworkAdapterConfiguration.wmi
 resources/win32/wmi/xp-Win32_PhysicalMemory.wmi
@@ -907,6 +913,7 @@ share/html/now.tpl
 share/html/site.css
 share/pci.ids
 share/usb.ids
+SIGNATURE
 t/01compile.t
 t/02critic.t
 t/03var.t
@@ -937,6 +944,20 @@ t/agent/tools/aix.t
 t/agent/tools/bsd.t
 t/agent/tools/generic.t
 t/agent/tools/hardware.t
+t/agent/tools/hardware/alcatel.t
+t/agent/tools/hardware/canon.t
+t/agent/tools/hardware/cisco.t
+t/agent/tools/hardware/d-link.t
+t/agent/tools/hardware/dell.t
+t/agent/tools/hardware/epson.t
+t/agent/tools/hardware/hewlett-packard.t
+t/agent/tools/hardware/juniper.t
+t/agent/tools/hardware/konika.t
+t/agent/tools/hardware/kyocera.t
+t/agent/tools/hardware/lexmark.t
+t/agent/tools/hardware/ricoh.t
+t/agent/tools/hardware/sharp.t
+t/agent/tools/hardware/xerox.t
 t/agent/tools/hardware_cdp.t
 t/agent/tools/hpux.t
 t/agent/tools/linux.t
@@ -968,6 +989,7 @@ t/lib/FusionInventory/Agent/Logger/Fatal.pm
 t/lib/FusionInventory/Agent/Logger/Test.pm
 t/lib/FusionInventory/Test/Agent.pm
 t/lib/FusionInventory/Test/Auth.pm
+t/lib/FusionInventory/Test/Hardware.pm
 t/lib/FusionInventory/Test/Inventory.pm
 t/lib/FusionInventory/Test/Module.pm
 t/lib/FusionInventory/Test/Proxy.pm
@@ -978,15 +1000,6 @@ t/tasks/deploy/diskfree.t
 t/tasks/deploy/file.t
 t/tasks/deploy/p2p.t
 t/tasks/deploy/validate.t
-t/tasks/discovery/canon.t
-t/tasks/discovery/cisco.t
-t/tasks/discovery/epson.t
-t/tasks/discovery/hewlett-packard.t
-t/tasks/discovery/juniper.t
-t/tasks/discovery/kyocera.t
-t/tasks/discovery/lexmark.t
-t/tasks/discovery/ricoh.t
-t/tasks/discovery/xerox.t
 t/tasks/inventory/aix/controllers.t
 t/tasks/inventory/aix/memory.t
 t/tasks/inventory/aix/modems.t
@@ -1056,6 +1069,7 @@ t/tasks/inventory/virtualization/vmsystem.t
 t/tasks/inventory/virtualization/xen.t
 t/tasks/inventory/windows/bios.t
 t/tasks/inventory/windows/cpu.t
+t/tasks/inventory/windows/drives.t
 t/tasks/inventory/windows/memory.t
 t/tasks/inventory/windows/printers.t
 t/tasks/inventory/windows/registry.t
