@@ -29,7 +29,7 @@ sub new {
     my $error;
     if ($version eq 'snmpv3') {
         ($self->{session}, $error) = Net::SNMP->session(
-            -timeout      => 1,
+            -timeout      => 15,
             -retries      => 0,
             -version      => $version,
             -hostname     => $params{hostname},
@@ -166,8 +166,3 @@ Can be one of:
 =item privprotocol
 
 =back
-
-=head2 switch_community(suffix)
-
-Initiate a new SNMP connection, using a community derived from original one,
-with a suffix appended.

@@ -37,18 +37,18 @@ our $ip_address_pattern = qr/
 /x;
 
 our $alt_mac_address_pattern = qr/
-    $padded_hex_byte 
-    $padded_hex_byte 
-    $padded_hex_byte 
-    $padded_hex_byte 
-    $padded_hex_byte 
+    $padded_hex_byte
+    $padded_hex_byte
+    $padded_hex_byte
+    $padded_hex_byte
+    $padded_hex_byte
     $padded_hex_byte
 /x;
 
 our $hex_ip_address_pattern = qr/
-    $padded_hex_byte 
-    $padded_hex_byte 
-    $padded_hex_byte 
+    $padded_hex_byte
+    $padded_hex_byte
+    $padded_hex_byte
     $padded_hex_byte
 /x;
 
@@ -125,7 +125,7 @@ sub resolv {
     );
     if ($error && $logger) {
         $logger->error("unable to resolve `$string': $error");
-        next;
+        return;
     }
 
     # and push all of their addresses in the list
@@ -135,11 +135,11 @@ sub resolv {
             Socket::GetAddrInfo::NI_NUMERICHOST(),
         );
         # Drop the zone index. Net::IP do not support them
-        $host =~ s/%.*$//;
         if ($error && $logger) {
-            $logger->error("unable to get host `$host' IP address: $error");
+            $logger->error("unable to get hostname of IP address `$result->{addr}': $error");
             next;
         }
+        $host =~ s/%.*$//;
         push @ret, Net::IP->new($host);
     }
 
