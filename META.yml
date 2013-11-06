@@ -67,4 +67,5 @@ requires:
   perl: 5.8.0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 2.3.2
+  repository: https://github.com/fusinv/fusioninventory-agent
+version: 2.3.3

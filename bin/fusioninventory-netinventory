@@ -17,6 +17,14 @@ my $options = {
     community => 'public'
 };
 
+my %setup = (
+    confdir => './etc',
+    datadir => './share',
+    libdir  => './lib',
+    vardir  => './var',
+);
+
+
 GetOptions(
     $options,
     'model=s',
@@ -24,6 +32,7 @@ GetOptions(
     'file=s',
     'community=s',
     'entity=s',
+    'timeout=i',
     'verbose',
     'debug+',
     'help',
@@ -54,6 +63,7 @@ my $type =
                           undef        ;
 
 my $inventory = FusionInventory::Agent::Task::NetInventory->new(
+    %setup,
     target => FusionInventory::Agent::Task::NetInventory::Target->new(),
     logger =>  FusionInventory::Agent::Logger->new(
         debug => $options->{debug}
@@ -65,11 +75,13 @@ $inventory->{options} = {
     PARAM => [
         {
             PID           => 1,
-            THREADS_QUERY => 1
+            THREADS_QUERY => 1,
+            TIMEOUT       => $options->{timeout},
         }
     ],
     DEVICE => [
         {
+            ID           => 0,
             TYPE         => $type,
             IP           => $options->{host},
             FILE         => $options->{file},
@@ -148,6 +160,7 @@ fusioninventory-netinventory [options] [--host <host>--file <file>]
     --file         snmpwalk output file
     --model model  XML model file
     --community    community string (default: public)
+    --timeout val  SNMP timeout (default: 15s)
     --entity       GLPI entity
     --verbose      verbose output (control messages)
     --debug        debug output (execution traces)

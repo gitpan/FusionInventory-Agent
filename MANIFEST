@@ -7,9 +7,6 @@ bin/fusioninventory-netinventory
 bin/fusioninventory-wakeonlan
 bin/fusioninventory-win32-service
 Changes
-Changes.deploy
-Changes.esx
-Changes.network
 contrib/FusionInventory.adml
 contrib/FusionInventory.admx
 contrib/Tarballs.pm
@@ -245,7 +242,6 @@ lib/FusionInventory/Agent/Tools/BSD.pm
 lib/FusionInventory/Agent/Tools/Generic.pm
 lib/FusionInventory/Agent/Tools/Generic/License.pm
 lib/FusionInventory/Agent/Tools/Hardware.pm
-lib/FusionInventory/Agent/Tools/Hardware/3Com.pm
 lib/FusionInventory/Agent/Tools/Hardware/Alcatel.pm
 lib/FusionInventory/Agent/Tools/Hardware/Axis.pm
 lib/FusionInventory/Agent/Tools/Hardware/Generic.pm
@@ -270,8 +266,6 @@ LICENSE
 Makefile.PL
 MANIFEST			This list of files
 META.yml
-MYMETA.json
-MYMETA.yml
 README
 resources/aix/lparstat/README
 resources/aix/lparstat/sample1
@@ -767,6 +761,7 @@ resources/solaris/fcinfo_hba-port/sample-1
 resources/solaris/iostat/sample1
 resources/solaris/iostat/sample2
 resources/solaris/iostat/sample3-wrong-vendor-product
+resources/solaris/iostat/sample4-slash-char-in-model
 resources/solaris/mount/mount_-v_sample1
 resources/solaris/opensolaris/release-1
 resources/solaris/opensolaris/smbios-1
@@ -914,6 +909,22 @@ share/html/logo.png
 share/html/now.tpl
 share/html/site.css
 share/pci.ids
+share/sysobjectid.3com.ids
+share/sysobjectid.alcatel.ids
+share/sysobjectid.avocent.ids
+share/sysobjectid.cisco.ids
+share/sysobjectid.d-link.ids
+share/sysobjectid.dell.ids
+share/sysobjectid.epson.ids
+share/sysobjectid.extreme.ids
+share/sysobjectid.hewlett-packard.ids
+share/sysobjectid.juniper.ids
+share/sysobjectid.konica.ids
+share/sysobjectid.lexmark.ids
+share/sysobjectid.netscreen.ids
+share/sysobjectid.nortel.ids
+share/sysobjectid.sharp.ids
+share/sysobjectid.xerox.ids
 share/usb.ids
 t/01compile.t
 t/02critic.t
@@ -950,7 +961,9 @@ t/agent/tools/hardware/canon.t
 t/agent/tools/hardware/cisco.t
 t/agent/tools/hardware/d-link.t
 t/agent/tools/hardware/dell.t
+t/agent/tools/hardware/emc.t
 t/agent/tools/hardware/epson.t
+t/agent/tools/hardware/extreme.t
 t/agent/tools/hardware/hewlett-packard.t
 t/agent/tools/hardware/juniper.t
 t/agent/tools/hardware/konika.t
@@ -959,8 +972,9 @@ t/agent/tools/hardware/lexmark.t
 t/agent/tools/hardware/nortel.t
 t/agent/tools/hardware/ricoh.t
 t/agent/tools/hardware/sharp.t
+t/agent/tools/hardware/tandberg.t
 t/agent/tools/hardware/xerox.t
-t/agent/tools/hardware_cdp.t
+t/agent/tools/hardware_generic.t
 t/agent/tools/hpux.t
 t/agent/tools/linux.t
 t/agent/tools/macos.t

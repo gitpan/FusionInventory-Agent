@@ -1,5 +1,21 @@
 Revision history for FusionInventory agent
 
+2.3.3  Wed, 06 Nov 2013 21:00:25 +0100
+core
+* clean up in the distribution, thanks Olivier Mengué <dolmen@cpan.org>
+
+inventory task
+* fix missing 32bits software on 64bits windows (#2212)
+
+netinventory task
+* fix SNMP reconnection when issuing VLAN-specific queries on some Cisco
+  devices (#2178)
+* use longer default SNMP timeout, and make them configurable
+* handle MAC addresses with embedded VLAN identifier
+
+netdiscovery task
+* backport device model identification from sysobjectid value
+
 2.3.2  Fri, 20 Sep 2013 10:52:30 +0200
 core
 * avoid some warning messages
