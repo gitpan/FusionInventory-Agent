@@ -22,58 +22,37 @@ sub new {
 
     die "invalid SNMP version $params{version}" unless $version;
 
-    my $self = {
-        community => $params{community}
-    };
+    # shared options
+    my %options = (
+        -retries  => 0,
+        -version  => $version,
+        -hostname => $params{hostname},
+    );
+    $options{'-timeout'} = $params{timeout} if $params{timeout};
 
-    my $error;
+    # version-specific options
     if ($version eq 'snmpv3') {
-        ($self->{session}, $error) = Net::SNMP->session(
-            -retries      => 0,
-            -version      => $version,
-            -hostname     => $params{hostname},
-            -username     => $params{username},
-            -authpassword => $params{authpassword},
-            -authprotocol => $params{authprotocol},
-            -privpassword => $params{privpassword},
-            -privprotocol => $params{privprotocol},
-        );
+        # only username is mandatory
+        $options{'-username'}     = $params{username};
+        $options{'-authprotocol'} = $params{authprotocol}
+            if $params{authprotocol};
+        $options{'-authpassword'} = $params{authpassword}
+            if $params{authpassword};
+        $options{'-privprotocol'} = $params{privprotocol}
+            if $params{privprotocol};
+        $options{'-privpassword'} = $params{privpassword}
+            if $params{privpassword};
     } else { # snmpv2c && snmpv1 #
-        ($self->{session}, $error) = Net::SNMP->session(
-            -retries   => 0,
-            -version   => $version,
-            -hostname  => $params{hostname},
-            -community => $params{community},
-        );
+        $options{'-community'} = $params{community};
     }
 
+    my $self = {};
+    ($self->{session}, my $error) = Net::SNMP->session(%options);
     die $error unless $self->{session};
-
-    $self->{session}->timeout($params{timeout}) if $params{timeout};
 
     bless $self, $class;
 
     return $self;
-}
-
-sub switch_community {
-    my ($self, $suffix) = @_;
-
-    my $version_id = $self->{session}->version();
-    my $version =
-        $version_id == 0 ? 'snmpv1'  :
-        $version_id == 1 ? 'snmpv2c' :
-        $version_id == 2 ? 'snmpv3'  :
-                             undef   ;
-    my $error;
-    ($self->{session}, $error) = Net::SNMP->session(
-            -timeout   => $self->{session}->timeout(),
-            -retries   => 0,
-            -version   => $version,
-            -hostname  => $self->{session}->hostname(),
-            -community => $self->{community} . $suffix
-    );
-    die $error unless $self->{session};
 }
 
 sub get {

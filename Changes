@@ -1,5 +1,24 @@
 Revision history for FusionInventory agent
 
+2.3.4  Fri, 29 Nov 2013 16:17:31 +0100
+netdiscovery task:
+* install missing sysobjectid database files
+* add additional device types (phones, storage, etc...) support
+
+netinventory task:
+* add default OIDs for mappings undefined in SNMP model
+* add IFALIAS support for interfaces
+* allow SNMPv3 usage from fusioninventory-netinventory
+* allow discovery without model from fusioninventory-netinventory
+
+netinventory and netdiscovery tasks:
+* fix infinite recursion in mac address canonicalisation, leading to memory
+  exhaustion (#2336)
+* fix SNMPv3 usage without optional parameters
+
+linux:
+* OpenVZ: disable the Virtuozzo module if libvirt is already plugged on OpenVZ
+
 2.3.3  Wed, 06 Nov 2013 21:00:25 +0100
 core
 * clean up in the distribution, thanks Olivier Mengué <dolmen@cpan.org>

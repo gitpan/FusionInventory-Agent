@@ -1,7 +1,6 @@
 ---
 abstract: 'FusionInventory unified Agent for UNIX, Linux, Windows and MacOSX'
 build_requires:
-  Clone: 0
   ExtUtils::MakeMaker: 6.59
   HTTP::Proxy: 0
   HTTP::Server::Simple: 0
@@ -68,4 +67,4 @@ requires:
 resources:
   license: http://opensource.org/licenses/gpl-license.php
   repository: https://github.com/fusinv/fusioninventory-agent
-version: 2.3.3
+version: 2.3.4

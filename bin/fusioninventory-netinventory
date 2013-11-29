@@ -13,8 +13,17 @@ use FusionInventory::Agent::Task::NetInventory;
 use FusionInventory::Agent::Tools::Hardware;
 use FusionInventory::Agent::Logger;
 
+my %types = (
+    1 => 'COMPUTER',
+    2 => 'NETWORKING',
+    3 => 'PRINTER',
+    4 => 'STORAGE',
+    5 => 'POWER',
+    6 => 'PHONE',
+    7 => 'VIDEO',
+);
+
 my $options = {
-    community => 'public'
 };
 
 my %setup = (
@@ -24,13 +33,14 @@ my %setup = (
     vardir  => './var',
 );
 
-
 GetOptions(
     $options,
     'model=s',
+    'type=s',
     'host=s',
     'file=s',
     'community=s',
+    'credentials=s',
     'entity=s',
     'timeout=i',
     'verbose',
@@ -46,21 +56,51 @@ if ($options->{version}) {
 pod2usage(-verbose => 0, -exitval => 0) if $options->{help};
 
 pod2usage(
-    -message => "no model given, aborting\n", -verbose => 0
-) unless $options->{model};
-pod2usage(
-    -message => "invalid file '$options->{model}', aborting\n", -verbose => 0
-) unless -f $options->{model};
-pod2usage(
     -message => "no host nor file given, aborting\n", -verbose => 0
 ) unless $options->{host} or $options->{file};
 
-my $model = loadModel($options->{model});
-my $type =
-    $model->{TYPE} == 1 ? 'COMPUTER'   :
-    $model->{TYPE} == 2 ? 'NETWORKING' :
-    $model->{TYPE} == 3 ? 'PRINTER'    :
-                          undef        ;
+my $device = {
+    ID           => 0,
+    IP           => $options->{host},
+    FILE         => $options->{file},
+    AUTHSNMP_ID  => 1,
+    MODELSNMP_ID => 1
+};
+
+my $model       = { ID => 1 };
+my $credentials = { ID => 1 };
+
+if ($options->{model}) {
+    pod2usage(
+        -message => "invalid file '$options->{model}', aborting\n",
+        -verbose => 0
+    ) unless -f $options->{model};
+    $model = loadModel($options->{model});
+}
+
+if ($options->{type}) {
+    pod2usage(
+        -message => "invalid type '$options->{type}', aborting\n",
+        -verbose => 0
+    ) unless any { $options->{type} eq $_ } values %types;
+    $device->{TYPE} = $options->{type};
+}
+
+if ($options->{community}) {
+    $credentials->{COMMUNITY} = $options->{community};
+} elsif (defined $options->{credentials}) {
+    foreach my $parameter (split(',', $options->{credentials})) {
+        my ($key, $value) = split(':', $parameter);
+        $key = uc($key);
+        $credentials->{$key} = $value;
+    }
+} else {
+    $credentials->{COMMUNITY} = 'public';
+}
+
+if ($options->{entity}) {
+    $device = $options->{entity};
+}
 
 my $inventory = FusionInventory::Agent::Task::NetInventory->new(
     %setup,
@@ -79,27 +119,11 @@ $inventory->{options} = {
             TIMEOUT       => $options->{timeout},
         }
     ],
-    DEVICE => [
-        {
-            ID           => 0,
-            TYPE         => $type,
-            IP           => $options->{host},
-            FILE         => $options->{file},
-            AUTHSNMP_ID  => 1,
-            MODELSNMP_ID => 1
-        }
-    ],
-    MODEL => [ $model ],
-    AUTHENTICATION => [
-        {
-            ID        => 1,
-            COMMUNITY => $options->{community},
-        }
-    ]
+    DEVICE         => [ $device ],
+    MODEL          => [ $model ],
+    AUTHENTICATION => [ $credentials ]
 };
-if (defined($options->{entity})) {
-    $inventory->{options}->{DEVICE}->[0]->{ENTITY} = $options->{entity};
-}
+
 $inventory->{client} =
     FusionInventory::Agent::Task::NetInventory::Client->new(
         verbose => $options->{verbose}
@@ -160,6 +184,7 @@ fusioninventory-netinventory [options] [--host <host>--file <file>]
     --file         snmpwalk output file
     --model model  XML model file
     --community    community string (default: public)
+    --credentials  SNMP credentials
     --timeout val  SNMP timeout (default: 15s)
     --entity       GLPI entity
     --verbose      verbose output (control messages)

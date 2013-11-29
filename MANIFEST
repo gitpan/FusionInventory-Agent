@@ -244,10 +244,8 @@ lib/FusionInventory/Agent/Tools/Generic/License.pm
 lib/FusionInventory/Agent/Tools/Hardware.pm
 lib/FusionInventory/Agent/Tools/Hardware/Alcatel.pm
 lib/FusionInventory/Agent/Tools/Hardware/Axis.pm
-lib/FusionInventory/Agent/Tools/Hardware/Generic.pm
 lib/FusionInventory/Agent/Tools/Hardware/HewlettPackard.pm
 lib/FusionInventory/Agent/Tools/Hardware/Kyocera.pm
-lib/FusionInventory/Agent/Tools/Hardware/Nortel.pm
 lib/FusionInventory/Agent/Tools/Hardware/Wyse.pm
 lib/FusionInventory/Agent/Tools/Hardware/Zebranet.pm
 lib/FusionInventory/Agent/Tools/Hostname.pm
@@ -974,12 +972,10 @@ t/agent/tools/hardware/ricoh.t
 t/agent/tools/hardware/sharp.t
 t/agent/tools/hardware/tandberg.t
 t/agent/tools/hardware/xerox.t
-t/agent/tools/hardware_generic.t
 t/agent/tools/hpux.t
 t/agent/tools/linux.t
 t/agent/tools/macos.t
 t/agent/tools/network.t
-t/agent/tools/snmp.t
 t/agent/tools/solaris.t
 t/agent/tools/unix.t
 t/agent/tools/win32.t

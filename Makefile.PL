@@ -51,7 +51,6 @@ test_requires 'Test::MockModule'             => undef;
 test_requires 'Test::More'                   => '0.93'; # subtest
 test_requires 'Test::NoWarnings'             => undef;
 test_requires 'LWP::Protocol::https'         => undef;
-test_requires 'Clone'                        => undef;
 test_requires 'Test::MockObject'             => undef;
 test_requires 'JSON'                         => undef;
 test_requires 'Net::SNMP'                    => undef;
@@ -205,6 +204,7 @@ data_install :
 	install -d -m 755 $(DESTDIR)$(DATADIR)
 	install -m 644 share/pci.ids $(DESTDIR)$(DATADIR)/
 	install -m 644 share/usb.ids $(DESTDIR)$(DATADIR)/
+	install -m 644 share/sysobjectid.*.ids $(DESTDIR)$(DATADIR)/
 	install -d -m 755 $(DESTDIR)$(DATADIR)/html
 	install -m 644 share/html/* $(DESTDIR)$(DATADIR)/html
 EOF
