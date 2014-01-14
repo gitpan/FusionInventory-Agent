@@ -67,4 +67,4 @@ requires:
 resources:
   license: http://opensource.org/licenses/gpl-license.php
   repository: https://github.com/fusinv/fusioninventory-agent
-version: 2.3.4
+version: 2.3.5

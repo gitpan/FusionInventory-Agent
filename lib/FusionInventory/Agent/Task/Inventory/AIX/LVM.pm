@@ -21,99 +21,83 @@ sub doInventory {
         $inventory->addEntry(section => 'PHYSICAL_VOLUMES', entry => $volume);
     }
 
-    foreach my $volume (_getLogicalVolumes($logger)) {
-        $inventory->addEntry(section => 'LOGICAL_VOLUMES', entry => $volume);
-    }
-
     foreach my $group (_getVolumeGroups($logger)) {
         $inventory->addEntry(section => 'VOLUME_GROUPS', entry => $group);
-    }
 
+        foreach my $volume (_getLogicalVolumes($logger, $group->{LV_NAME})) {
+            $inventory->addEntry(section => 'LOGICAL_VOLUMES', entry => $volume);
+        }
+    }
 }
 
 sub _getLogicalVolumes {
-    my ($logger) = @_;
+    my ($logger, $group) = @_;
 
     my $handle = getFileHandle(
-        command => "lsvg",
+        command => "lsvg -l $group",
         logger  => $logger
     );
     return unless $handle;
+
+    # skip headers
+    my $line;
+    $line = <$handle>;
+    $line = <$handle>;
+
+    # no logical volume if there is only one line of output
+    return unless $line;
 
     my @volumes;
 
     while (my $line = <$handle>) {
         chomp $line;
-        push @volumes, _getLogicalVolume($logger, $line);
+        my ($name) = split(/\s+/, $line);
+        push @volumes, _getLogicalVolume(logger => $logger, name => $name);
     }
+
     close $handle;
 
     return @volumes;
 }
 
 sub _getLogicalVolume {
-    my ($logger, $name) = @_;
-
-    my $handle = getFileHandle(
-        command => "lsvg -l $name",
-        logger  => $logger
-    );
-    return unless $handle;
-
-    my $volume;
-
-    while (my $line = <$handle>) {
-        chomp $line;
-
-        if ($line =~ /(\S+):/) {
-            $volume->{VG_UUID} = $1;
-        }
-        if ($line !~ /^LV NAME/ && $line =~ /(\S+) *(\S+) *(\d+) *(\d+) *(\d+) *(\S+) *(\S+)/) {
-            $volume->{LV_NAME}   = $1;
-            $volume->{SEG_COUNT} = $3;
-            $volume->{ATTR}      = "Type $2,PV: $5";
-        }
-    }
-    close $handle;
-
-    my ($size, $uuid) = _getVolumeInfo(
-        name   => $volume->{LV_NAME},
-        logger => $logger
-    );
-    $volume->{SIZE} = int($volume->{SEG_COUNT} * $size);
-    $volume->{LV_UUID} = $uuid;
-
-    return $volume;
-}
-
-sub _getVolumeInfo {
     my (%params) = @_;
 
-    my $handle = getFileHandle(
-        command => "lslv $params{name}",
-        logger  => $params{logger}
-    );
+    my $command = $params{name} ? "lslv $params{name}" : undef;
+    my $handle = getFileHandle(command => $command, %params);
     return unless $handle;
 
-    my ($size, $uuid);
+    my $volume = {
+        LV_NAME => $params{name}
+    };
+
+    my $size;
     while (my $line = <$handle>) {
-        if ($line =~ /.*PP SIZE:\s+(\d+) .*/) {
+        if ($line =~ /PP SIZE:\s+(\d+)/) {
             $size = $1;
         }
-        if ($line =~ /LV IDENTIFIER:\s+(\S+)/) {
-            $uuid = $1;
+        if ($line =~ /^LV IDENTIFIER:\s+(\S+)/) {
+            $volume->{LV_UUID} = $1;
+        }
+        if ($line =~ /^LPs:\s+(\S+)/) {
+            $volume->{SEG_COUNT} = $1;
+        }
+        if ($line =~ /^TYPE:\s+(\S+)/) {
+            $volume->{ATTR} = "Type $1",
         }
     }
     close $handle;
 
-    return ($size, $uuid);
+    $volume->{SIZE} = $volume->{SEG_COUNT} * $size;
+
+    return $volume;
 }
 
 sub _getPhysicalVolumes {
     my ($logger) = @_;
 
     my $handle = getFileHandle(
-        command => "lspv | cut -f1 -d' '",
+        command => 'lspv',
         logger  => $logger
     );
     return unless $handle;
@@ -122,7 +106,8 @@ sub _getPhysicalVolumes {
 
     while (my $line = <$handle>) {
         chomp $line;
-        push @volumes, _getPhysicalVolume($logger, $line);
+        my ($name) = split(/\s+/, $line);
+        push @volumes, _getPhysicalVolume(logger => $logger, name => $name);
     }
     close $handle;
 
@@ -130,16 +115,14 @@ sub _getPhysicalVolumes {
 }
 
 sub _getPhysicalVolume {
-    my ($logger, $name) = @_;
+    my (%params) = @_;
 
-    my $handle = getFileHandle(
-        command => "lspv $name",
-        logger  => $logger
-    );
+    my $command = $params{name} ? "lspv $params{name}" : undef;
+    my $handle = getFileHandle(command => $command, %params);
     return unless $handle;
 
     my $volume = {
-        DEVICE  => "/dev/$name"
+        DEVICE  => "/dev/$params{name}"
     };
 
     my ($free, $total);
@@ -167,9 +150,11 @@ sub _getPhysicalVolume {
     }
     close $handle;
 
-    $volume->{SIZE} = $total * $volume->{PE_SIZE};
-    $volume->{FREE} = $free * $volume->{PE_SIZE};
-    $volume->{PV_PE_COUNT} = $total;
+    if (defined $volume->{PE_SIZE}) {
+        $volume->{SIZE} = $total * $volume->{PE_SIZE} if defined $total;
+        $volume->{FREE} = $free * $volume->{PE_SIZE} if defined $free;
+    }
+    $volume->{PV_PE_COUNT} = $total if defined $total;
 
     return $volume;
 }
@@ -187,7 +172,7 @@ sub _getVolumeGroups {
 
     while (my $line = <$handle>) {
         chomp $line;
-        push @groups, _getVolumeGroup($logger, $line);
+        push @groups, _getVolumeGroup(logger => $logger, name => $line);
     }
     close $handle;
 
@@ -195,16 +180,14 @@ sub _getVolumeGroups {
 }
 
 sub _getVolumeGroup {
-    my ($logger, $name) = @_;
+    my (%params) = @_;
 
-    my $handle = getFileHandle(
-        command => "lsvg $name",
-        logger  => $logger
-    );
+    my $command = $params{name} ? "lsvg $params{name}" : undef;
+    my $handle = getFileHandle(command => $command, %params);
     return unless $handle;
 
     my $group = {
-        VG_NAME => $name
+        VG_NAME => $params{name}
     };
 
     while (my $line = <$handle>) {

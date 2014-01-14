@@ -19,6 +19,7 @@ sub new {
             die "unreadable $params{file} file parameter"
                 unless -r $params{file};
             $self->{values} = _getIndexedValues($params{file});
+            $self->{file}   = $params{file};
             last SWITCH;
         }
 
@@ -29,6 +30,26 @@ sub new {
     }
 
     return $self;
+}
+
+sub switch_vlan_context {
+    my ($self, $vlan_id) = @_;
+
+    $self->{oldvalues} = $self->{values} unless $self->{oldvalues};
+
+    my $file = $self->{file} . '@' . $vlan_id;
+    if (-r $file && -f $file) {
+        $self->{values} = _getIndexedValues($file);
+    } else {
+        delete $self->{values};
+    }
+}
+
+sub reset_original_context {
+    my ($self) = @_;
+
+    $self->{values} = $self->{oldvalues};
+    delete $self->{oldvalues};
 }
 
 sub _getIndexedValues {
@@ -88,7 +109,7 @@ sub _readSymbolicOids {
         'IF-MIB::ifInErrors'                => '.1.3.6.1.2.1.2.2.1.14',
         'IF-MIB::ifOutOctets'               => '.1.3.6.1.2.1.2.2.1.16',
         'IF-MIB::ifOutErrors'               => '.1.3.6.1.2.1.2.2.1.20',
-        'IF-MIB::ifName      '              => '.1.3.6.1.2.1.31.1.1.1.1',
+        'IF-MIB::ifName'                    => '.1.3.6.1.2.1.31.1.1.1.1',
         'HOST-RESOURCES-MIB::hrDeviceDescr' => '.1.3.6.1.2.1.25.3.2.1.3',
     );
 

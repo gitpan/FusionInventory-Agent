@@ -232,6 +232,7 @@ my @sysdescr_rules = (
 my %base_variables = (
     MAC          => {
         mapping => 'macaddr',
+        default => '.1.3.6.1.2.1.17.1.1.0',
         type    => 'mac',
     },
     CPU          => {
@@ -261,6 +262,11 @@ my %base_variables = (
     },
     SERIAL       => {
         mapping => 'serial',
+        default => [
+            '.1.3.6.1.2.1.47.1.1.1.1.11.1',
+            '.1.3.6.1.2.1.47.1.1.1.1.11.2',
+            '.1.3.6.1.2.1.47.1.1.1.1.11.1001',
+        ],
         type    => 'serial',
     },
     NAME         => {
@@ -279,7 +285,10 @@ my %base_variables = (
     },
     MEMORY       => {
         mapping => 'memory',
-        default => '.1.3.6.1.2.1.25.2.3.1.5.1',
+        default => [
+            '.1.3.6.1.4.1.9.2.1.8.0',
+            '.1.3.6.1.2.1.25.2.3.1.5.1',
+        ],
         type    => 'memory',
     },
     RAM          => {
@@ -303,7 +312,10 @@ my %interface_variables = (
     },
     IFNAME           => {
         mapping => 'ifName',
-        default => '.1.3.6.1.2.1.2.2.1.2',
+        default => [
+            '.1.3.6.1.2.1.31.1.1.1.1',
+            '.1.3.6.1.2.1.2.2.1.2',
+        ],
         type    => 'string',
     },
     IFTYPE           => {
@@ -780,13 +792,28 @@ sub _setGenericProperties {
         # don't overwrite known values
         next if $device->{INFO}->{$key};
 
-        # skip undefined variable
         my $variable = $base_variables{$key};
-        my $oid = $model->{oids}->{$variable->{mapping}} ||
-                  $variable->{default};
-        next unless $oid;
+        my $raw_value;
 
-        my $raw_value = $snmp->get($oid);
+        # first, try model mapping, if defined
+        if ($model->{oids}->{$variable->{mapping}}) {
+            $raw_value = $snmp->get($model->{oids}->{$variable->{mapping}});
+        }
+
+        # second, try default value, if defined
+        if (!defined $raw_value) {
+            if ($variable->{default}) {
+                if (ref $variable->{default} eq 'ARRAY') {
+                    foreach my $default (@{$variable->{default}}) {
+                        $raw_value = $snmp->get($default);
+                        last if defined $raw_value;
+                    }
+                } else {
+                    $raw_value = $snmp->get($variable->{default});
+                }
+            }
+        }
+
         next unless defined $raw_value;
 
         my $type = $variable->{type};
@@ -813,10 +840,27 @@ sub _setGenericProperties {
 
     foreach my $key (keys %interface_variables) {
         my $variable = $interface_variables{$key};
-        my $oid = $model->{oids}->{$variable->{mapping}} ||
-                  $variable->{default};
-        next unless $oid;
-        my $results = $snmp->walk($oid);
+
+        my $results;
+
+        # first, try model mapping, if defined
+        if ($model->{oids}->{$variable->{mapping}}) {
+            $results = $snmp->walk($model->{oids}->{$variable->{mapping}});
+        }
+
+        # second, try default value, if defined
+        if (!$results) {
+            if ($variable->{default}) {
+                if (ref $variable->{default} eq 'ARRAY') {
+                    foreach my $default (@{$variable->{default}}) {
+                        $results = $snmp->walk($default);
+                        last if $results;
+                    }
+                } else {
+                    $results = $snmp->walk($variable->{default});
+                }
+            }
+        }
         next unless $results;
 
         my $type = $variable->{type};
@@ -965,38 +1009,34 @@ sub _setNetworkingProperties {
         )
     }
 
-    my $comments = $device->{INFO}->{DESCRIPTION} || $device->{INFO}->{COMMENTS};
     my $ports    = $device->{PORTS}->{PORT};
 
-    my $vlans = $snmp->walk($model->{oids}->{vtpVlanName});
+    my $vlans = $snmp->walk($model->{oids}->{vtpVlanName} || '.1.3.6.1.4.1.9.9.46.1.3.1.1.4.1');
 
     # Detect VLAN
-    if ($model->{oids}->{vmvlan}) {
-        my $results = $snmp->walk($model->{oids}->{vmvlan});
-        # each result matches either of the following schemes:
-        # $prefix.$i.$j = $value, with $j as port id, and $value as vlan id
-        # $prefix.$i    = $value, with $i as port id, and $value as vlan id
-        foreach my $suffix (sort keys %{$results}) {
-            my $port_id = _getElement($suffix, -1);
-            my $vlan_id = $results->{$suffix};
-            my $name    = $vlans->{$vlan_id};
+    my $results = $snmp->walk(
+        $model->{oids}->{vmvlan} || '.1.3.6.1.4.1.9.9.68.1.2.2.1.2'
+    );
+    # each result matches either of the following schemes:
+    # $prefix.$i.$j = $value, with $j as port id, and $value as vlan id
+    # $prefix.$i    = $value, with $i as port id, and $value as vlan id
+    foreach my $suffix (sort keys %{$results}) {
+        my $port_id = _getElement($suffix, -1);
+        my $vlan_id = $results->{$suffix};
+        my $name    = $vlans->{$vlan_id};
 
-            # safety check
-            if (!$ports->{$port_id}) {
-                $logger->error("non-existing port $port_id, check vmvlan mapping");
-                last;
-            }
-            push
-                @{$ports->{$port_id}->{VLANS}->{VLAN}},
-                    {
-                        NUMBER => $vlan_id,
-                        NAME   => $name
-                    };
+        # safety check
+        if (!$ports->{$port_id}) {
+            $logger->error("non-existing port $port_id, check vmvlan mapping");
+            last;
         }
+        push
+            @{$ports->{$port_id}->{VLANS}->{VLAN}},
+                {
+                    NUMBER => $vlan_id,
+                    NAME   => $name
+                };
     }
-
-    # everything else is vendor-specific, and requires device description
-    return unless $comments;
 
     _setTrunkPorts(
         snmp   => $snmp,
@@ -1013,10 +1053,10 @@ sub _setNetworkingProperties {
     );
 
     _setAssociatedMacAddresses(
-        snmp   => $snmp,
-        model  => $model,
-        ports  => $ports,
-        logger => $logger
+        snmp         => $snmp,
+        model        => $model,
+        ports        => $ports,
+        logger       => $logger,
     );
 }
 
@@ -1042,30 +1082,6 @@ sub loadModel {
 
     my $model = XML::TreePP->new()->parsefile($file)->{model};
 
-    my @get = map {
-        {
-            OID    => $_->{oid},
-            OBJECT => $_->{mapping_name},
-            VLAN   => $_->{vlan},
-        }
-    } grep {
-        $_->{dynamicport} == 0
-    } grep {
-        $_->{mapping_name}
-    } @{$model->{oidlist}->{oidobject}};
-
-    my @walk = map {
-        {
-            OID    => $_->{oid},
-            OBJECT => $_->{mapping_name},
-            VLAN   => $_->{vlan},
-        }
-    } grep {
-        $_->{dynamicport} == 1
-    } grep {
-        $_->{mapping_name}
-    } @{$model->{oidlist}->{oidobject}};
-
     my %oids =
         map  { $_->{mapping_name} => $_->{oid} }
         grep { $_->{mapping_name} }
@@ -1075,8 +1091,6 @@ sub loadModel {
         ID   => 1,
         NAME => $model->{name},
         TYPE => $model->{type},
-        GET  => \@get,
-        WALK => \@walk,
         oids => \%oids
     }
 }
@@ -1104,6 +1118,7 @@ sub _getCanonicalMacAddress {
         }
     }
 
+    return if $result eq '00:00:00:00:00:00';
     return lc($result);
 }
 
@@ -1175,14 +1190,82 @@ sub _getElements {
 sub _setAssociatedMacAddresses {
     my (%params) = @_;
 
-    my $mac_addresses = _getAssociatedMacAddresses(
-        snmp  => $params{snmp},
-        model => $params{model}
+    # start with mac addresses seen on default VLAN
+    my $addresses = _getAssociatedMacAddresses(
+        snmp           => $params{snmp},
+        address2port   => '.1.3.6.1.2.1.17.4.3.1.2', # dot1dTpFdbPort
+        port2interface => '.1.3.6.1.2.1.17.1.4.1.2', # dot1dBasePortIfIndex
     );
-    return unless $mac_addresses;
+    return unless $addresses;
 
+    my $snmp   = $params{snmp};
     my $ports  = $params{ports};
     my $logger = $params{logger};
+
+    _addAssociatedMacAddresses(
+        ports     => $ports,
+        logger    => $logger,
+        addresses => $addresses,
+    );
+
+    # add additional mac addresses for other VLANs
+    $addresses = _getAssociatedMacAddresses(
+        snmp           => $params{snmp},
+        address2port   => '.1.3.6.1.2.1.17.7.1.2.2.1.2', # dot1qTpFdbPort
+        port2interface => '.1.3.6.1.2.1.17.1.4.1.2',     # dot1dBasePortIfIndex
+    );
+
+    if ($addresses) {
+        _addAssociatedMacAddresses(
+            ports     => $ports,
+            logger    => $logger,
+            addresses => $addresses,
+        );
+    } else {
+        # compute the list of vlans associated with at least one port
+        # without CDP/LLDP information
+        my @vlans;
+        my %seen = ( 1 => 1 );
+        foreach my $port (values %$ports) {
+            next if
+                exists $port->{CONNECTIONS} &&
+                exists $port->{CONNECTIONS}->{CDP} &&
+                $port->{CONNECTIONS}->{CDP};
+            next unless exists $port->{VLANS};
+            push @vlans,
+                grep { !$seen{$_}++ }
+                map { $_->{NUMBER} }
+                @{$port->{VLANS}->{VLAN}};
+        }
+
+        # get additional associated mac addresses from those vlans
+        foreach my $vlan (@vlans) {
+            $logger->debug("switching SNMP context to vlan $vlan") if $logger;
+            $snmp->switch_vlan_context($vlan);
+            my $mac_addresses = _getAssociatedMacAddresses(
+                snmp           => $params{snmp},
+                address2port   => '.1.3.6.1.2.1.17.4.3.1.2', # dot1dTpFdbPort
+                port2interface => '.1.3.6.1.2.1.17.1.4.1.2', # dot1dBasePortIfIndex
+            );
+            next unless $mac_addresses;
+
+            _addAssociatedMacAddresses(
+                ports     => $ports,
+                logger    => $logger,
+                addresses => $mac_addresses,
+            );
+        }
+        $snmp->reset_original_context() if @vlans;
+    }
+
+}
+
+sub _addAssociatedMacAddresses {
+    my (%params) = @_;
+
+    my $ports         = $params{ports};
+    my $logger        = $params{logger};
+    my $mac_addresses = $params{addresses};
 
     foreach my $port_id (keys %$mac_addresses) {
         # safety check
@@ -1200,15 +1283,22 @@ sub _setAssociatedMacAddresses {
             exists $port->{CONNECTIONS}->{CDP} &&
             $port->{CONNECTIONS}->{CDP};
 
-        # filter out the port own mac address, if known
-        my $addresses = $mac_addresses->{$port_id};
-        if (exists $port->{MAC}) {
-            $addresses = [ grep { $_ ne $port->{MAC} } @$addresses ];
-        }
+        # get at list of already associated addresses, if any
+        # as well as the port own mac address, if known
+        my @known;
+        push @known, $port->{MAC} if $port->{MAC};
+        push @known, @{$port->{CONNECTIONS}->{CONNECTION}->{MAC}} if
+            exists $port->{CONNECTIONS} &&
+            exists $port->{CONNECTIONS}->{CONNECTION} &&
+            exists $port->{CONNECTIONS}->{CONNECTION}->{MAC};
 
-        next unless @$addresses;
+        # filter out those addresses from the additional ones
+        my %known = map { $_ => 1 } @known;
+        my @adresses = grep { !$known{$_} } @{$mac_addresses->{$port_id}};
+        next unless @adresses;
 
-        $port->{CONNECTIONS}->{CONNECTION}->{MAC} = $addresses;
+        # add remaining ones
+        push @{$port->{CONNECTIONS}->{CONNECTION}->{MAC}}, @adresses;
     }
 }
 
@@ -1216,23 +1306,29 @@ sub _getAssociatedMacAddresses {
     my (%params) = @_;
 
     my $snmp   = $params{snmp};
-    my $model  = $params{model};
 
     my $results;
-    my $dot1dTpFdbPort       = $snmp->walk(
-        $model->{oids}->{dot1dTpFdbPort}       || '.1.3.6.1.2.1.17.4.3.1.2'
-    );
-    my $dot1dBasePortIfIndex = $snmp->walk(
-        $model->{oids}->{dot1dBasePortIfIndex} || '.1.3.6.1.2.1.17.1.4.1.2'
-    );
+    my $address2port   = $snmp->walk($params{address2port});
+    my $port2interface = $snmp->walk($params{port2interface});
 
-    foreach my $suffix (sort keys %{$dot1dTpFdbPort}) {
-        my $port_id      = $dot1dTpFdbPort->{$suffix};
-        my $interface_id = $dot1dBasePortIfIndex->{$port_id};
+    # dot1dTpFdbPort values matches the following scheme:
+    # $prefix.a.b.c.d.e.f = $port
+
+    # dot1qTpFdbPort values matches the following scheme:
+    # $prefix.$vlan.a.b.c.d.e.f = $port
+
+    # in both case, the last 6 elements of the OID constitutes
+    # the mac address in decimal format
+    foreach my $suffix (sort keys %{$address2port}) {
+        my $port_id      = $address2port->{$suffix};
+        my $interface_id = $port2interface->{$port_id};
         next unless defined $interface_id;
 
+        my @bytes = split(/\./, $suffix);
+        shift @bytes if @bytes > 6;
+
         push @{$results->{$interface_id}},
-            sprintf "%02x:%02x:%02x:%02x:%02x:%02x", split(/\./, $suffix)
+            sprintf "%02x:%02x:%02x:%02x:%02x:%02x", @bytes;
     }
 
     return $results;
@@ -1392,9 +1488,13 @@ sub _getTrunkPorts {
         $model->{oids}->{vlanTrunkPortDynamicStatus} ||
         '.1.3.6.1.4.1.9.9.46.1.6.1.1.14'
     );
-    while (my ($suffix, $trunk) = each %{$vlanStatus}) {
+
+    # Values:
+    # 1 : trunking
+    # 2 : notTrunking
+    while (my ($suffix, $status) = each %{$vlanStatus}) {
         my $port_id = _getElement($suffix, -1);
-        $results->{$port_id} = $trunk ? 1 : 0;
+        $results->{$port_id} = $status == 1 ? 1 : 0;
     }
 
     return $results;

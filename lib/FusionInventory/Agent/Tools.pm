@@ -23,6 +23,7 @@ our @EXPORT = qw(
     getCanonicalSpeed
     getCanonicalSize
     getSanitizedString
+    trimWhitespace
     getFirstLine
     getFirstMatch
     getLastLine
@@ -108,13 +109,13 @@ sub getCanonicalManufacturer {
         pioneer
     )/xi) {
         $manufacturer = ucfirst(lc($1));
-    } elsif ($manufacturer =~ /^(hp|HP|hewlett packard)/) {
+    } elsif ($manufacturer =~ /^(hp|HP|(?i)hewlett[ -]packard)/) {
         $manufacturer = "Hewlett-Packard";
-    } elsif ($manufacturer =~ /^(WDC|[Ww]estern)/) {
+    } elsif ($manufacturer =~ /^(WDC|(?i)western)/) {
         $manufacturer = "Western Digital";
-    } elsif ($manufacturer =~ /^(ST|[Ss]eagate)/) {
+    } elsif ($manufacturer =~ /^(ST|(?i)seagate)/) {
         $manufacturer = "Seagate";
-    } elsif ($manufacturer =~ /^(HD|IC|HU)/) {
+    } elsif ($manufacturer =~ /^(HD|IC|HU|HGST)/) {
         $manufacturer = "Hitachi";
     }
 
@@ -150,16 +151,20 @@ sub getCanonicalSize {
 
     return $size if $size =~ /^\d+$/;
 
-    return undef unless $size =~ /^([,.\d]+) \s? (\S+)$/x;
+    $size =~ s/ //g;
+
+    return undef unless $size =~ /^([,.\d]+) (\S+)$/x;
     my $value = $1;
     my $unit = lc($2);
 
+    use integer;
     return
-        $unit eq 'tb' ? $value * $base * $base :
-        $unit eq 'gb' ? $value * $base         :
-        $unit eq 'mb' ? $value                 :
-        $unit eq 'kb' ? $value * (1/$base)     :
-                        undef                  ;
+        $unit eq 'tb'    ? $value * $base * $base   :
+        $unit eq 'gb'    ? $value * $base           :
+        $unit eq 'mb'    ? $value                   :
+        $unit eq 'kb'    ? $value / ($base)         :
+        $unit eq 'bytes' ? $value / ($base * $base) :
+                           undef                    ;
 }
 
 sub compareVersion {
@@ -203,6 +208,14 @@ sub getSanitizedString {
     };
 
     return $string;
+}
+
+sub trimWhitespace {
+    my ($value) = @_;
+    $value =~ s/^\s+//;
+    $value =~ s/\s+$//;
+    $value =~ s/\s+/ /g;
+    return $value;
 }
 
 sub getDirectoryHandle {
@@ -538,6 +551,11 @@ Returns a normalized size value (in Mb) for given one.
 
 Returns the input stripped from any control character, properly encoded in
 UTF-8.
+
+=head2 trimWhitespace($string)
+
+Remove leading and trailing whitespace, and fold multiple whitespace
+characters into a single one.
 
 =head2 compareVersion($major, $minor, $min_major, $min_minor)
 

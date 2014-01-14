@@ -1,5 +1,28 @@
 Revision history for FusionInventory agent
 
+2.3.5  Tue, 14 Jan 2014 20:08:41 +0100
+netinventory task:
+* add more default OIDs for mappings undefined in SNMP model
+* fallback on default OID if SNMP model mapping doesn't bring any result
+* restore and enhance mac adressses extraction for connected devices on
+  non-default VLANs
+* fix trunk port identification
+* fix model loading with fusioninventory-netinventory
+
+inventory task:
+* get size for Adaptec RAID controller disks on Linux (#2360)
+* fix size reporting for LSI RAID controller disks on Linux
+* add support for modern MegaRAID controllers on Linux (#2361)
+* better identification for hard disk manufacturers (#2362)
+* fix timeout for user enumeration in AD environment on Windows (#2201)
+* fix a potential crash in software inventory on Windows
+* cleanup whitespace for DMI and /proc values (#2391)
+* fix multiple potential warnings on AIX (#2384)
+
+test suite:
+* fix test files list (#2394)
+* fix network interface enumeration test on Solaris (#2346)
+
 2.3.4  Fri, 29 Nov 2013 16:17:31 +0100
 netdiscovery task:
 * install missing sysobjectid database files

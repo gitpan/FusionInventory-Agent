@@ -15,14 +15,27 @@ my @size_tests_nok = (
 );
 
 my @size_tests_ok = (
-    [ '1'     , 1       ],
-    [ '1 mb'  , 1       ],
-    [ '1.1 mb', 1.1     ],
-    [ '1 MB'  , 1       ],
-    [ '1 gb'  , 1000    ],
-    [ '1 GB'  , 1000    ],
-    [ '1 tb'  , 1000000 ],
-    [ '1 TB'  , 1000000 ],
+    [ '1'                     , 1       ],
+    [ '1 mb'                  , 1       ],
+    [ '1.1 mb'                , 1.1     ],
+    [ '1 MB'                  , 1       ],
+    [ '1 gb'                  , 1000    ],
+    [ '1 GB'                  , 1000    ],
+    [ '1 tb'                  , 1000000 ],
+    [ '1 TB'                  , 1000000 ],
+    [ '128 035 676 160 bytes' , 128035  ],
+);
+
+my @size_1024_tests_ok = (
+    [ '1'                     , 1       ],
+    [ '1 mb'                  , 1       ],
+    [ '1.1 mb'                , 1.1     ],
+    [ '1 MB'                  , 1       ],
+    [ '1 gb'                  , 1024    ],
+    [ '1 GB'                  , 1024    ],
+    [ '1 tb'                  , 1048576 ],
+    [ '1 TB'                  , 1048576 ],
+    [ '128 035 676 160 bytes' , 122104  ],
 );
 
 my @speed_tests_nok = (
@@ -54,11 +67,16 @@ my @manufacturer_tests_ok = (
     [ 'matshita'       , 'Matshita'        ],
     [ 'pioneer'        , 'Pioneer'         ],
     [ 'hewlett packard', 'Hewlett-Packard' ],
+    [ 'hewlett-packard', 'Hewlett-Packard' ],
     [ 'hp'             , 'Hewlett-Packard' ],
     [ 'WDC'            , 'Western Digital' ],
     [ 'western'        , 'Western Digital' ],
+    [ 'Western'        , 'Western Digital' ],
+    [ 'WeStErN'        , 'Western Digital' ],
     [ 'ST'             , 'Seagate'         ],
     [ 'seagate'        , 'Seagate'         ],
+    [ 'Seagate'        , 'Seagate'         ],
+    [ 'SeAgAtE'        , 'Seagate'         ],
     [ 'HD'             , 'Hitachi'         ],
     [ 'IC'             , 'Hitachi'         ],
     [ 'HU'             , 'Hitachi'         ],
@@ -91,6 +109,14 @@ my @sanitization_tests = (
     [ "\x12fo\xA9\x12", "fo©" ],
 );
 
+my @whitespace_tests = (
+    [ "",            ""    ],
+    [ "foo",        "foo"    ],
+    [ " foo ",      "foo"    ],
+    [ " foo bar ",  "foo bar"    ],
+    [ " foo  bar ", "foo bar"    ],
+);
+
 my @hex2char_tests = (
     [ '0x41', 'A'  ],
     [ '41',   '41' ],
@@ -108,6 +134,7 @@ my @dec2hex_tests = (
 
 plan tests =>
     (scalar @size_tests_ok) +
+    (scalar @size_1024_tests_ok) +
     (scalar @size_tests_nok) +
     (scalar @speed_tests_ok) +
     (scalar @speed_tests_nok) +
@@ -116,6 +143,7 @@ plan tests =>
     (scalar @version_tests_ok) +
     (scalar @version_tests_nok) +
     (scalar @sanitization_tests) +
+    (scalar @whitespace_tests) +
     (scalar @hex2char_tests) +
     (scalar @hex2dec_tests) +
     (scalar @dec2hex_tests) +
@@ -131,6 +159,15 @@ foreach my $test (@size_tests_nok) {
 foreach my $test (@size_tests_ok) {
     cmp_ok(
         getCanonicalSize($test->[0]),
+        '==',
+        $test->[1],
+        "$test->[0] normalisation"
+    );
+}
+
+foreach my $test (@size_1024_tests_ok) {
+    cmp_ok(
+        getCanonicalSize($test->[0], 1024),
         '==',
         $test->[1],
         "$test->[0] normalisation"
@@ -187,6 +224,14 @@ foreach my $test (@sanitization_tests) {
         getSanitizedString($test->[0]),
         $test->[1],
         "$test->[0] sanitization"
+    );
+}
+
+foreach my $test (@whitespace_tests) {
+    is(
+        trimWhitespace($test->[0]),
+        $test->[1],
+        "$test->[0] whitespace trimming"
     );
 }
 
