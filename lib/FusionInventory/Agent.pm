@@ -21,7 +21,7 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Hostname;
 use FusionInventory::Agent::XML::Query::Prolog;
 
-our $VERSION = '2.3.5';
+our $VERSION = '2.3.6';
 our $VERSION_STRING = _versionString($VERSION);
 our $AGENT_STRING = "FusionInventory-Agent_v$VERSION";
 
@@ -152,6 +152,11 @@ sub init {
     my %available = $self->getAvailableTasks(disabledTasks => $config->{'no-task'});
     my @tasks = keys %available;
 
+    if (!@tasks) {
+        $logger->error("No tasks available, aborting");
+        exit 1;
+    }
+
     $logger->debug("Available tasks:");
     foreach my $task (keys %available) {
         $logger->debug("- $task: $available{$task}");
@@ -165,21 +170,13 @@ sub init {
         if ($EVAL_ERROR) {
             $logger->debug("Failed to load HTTP server: $EVAL_ERROR");
         } else {
-            # compute trusted addresses
-            my $trust = $config->{'httpd-trust'};
-            if ($config->{server}) {
-                foreach my $url (@{$config->{server}}) {
-                    push @{$config->{'httpd-trust'}}, URI->new($url)->host();
-                }
-            }
-
             $self->{server} = FusionInventory::Agent::HTTP::Server->new(
                 logger          => $logger,
                 agent           => $self,
                 htmldir         => $self->{datadir} . '/html',
                 ip              => $config->{'httpd-ip'},
                 port            => $config->{'httpd-port'},
-                trust           => $trust
+                trust           => $config->{'httpd-trust'}
             );
             $self->{server}->init();
         }

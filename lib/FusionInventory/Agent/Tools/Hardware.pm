@@ -65,6 +65,7 @@ my %sysobjectid_vendors = (
     3224  => { vendor => 'NetScreen',       type => 'NETWORKING' },
     3977  => { vendor => 'Broadband',       type => 'NETWORKING' },
     5596  => { vendor => 'Tandberg',        type => 'VIDEO'      },
+    6027  => { vendor => 'Force10',         type => 'NETWORKING' },
     6486  => { vendor => 'Alcatel',         type => 'NETWORKING' },
     6889  => { vendor => 'Avaya',           type => 'NETWORKING' },
     10418 => { vendor => 'Avocent'                               },
@@ -1049,7 +1050,8 @@ sub _setNetworkingProperties {
         snmp   => $snmp,
         model  => $model,
         ports  => $ports,
-        logger => $logger
+        logger => $logger,
+        vendor => $device->{INFO}->{MANUFACTURER}
     );
 
     _setAssociatedMacAddresses(
@@ -1190,27 +1192,28 @@ sub _getElements {
 sub _setAssociatedMacAddresses {
     my (%params) = @_;
 
-    # start with mac addresses seen on default VLAN
-    my $addresses = _getAssociatedMacAddresses(
-        snmp           => $params{snmp},
-        address2port   => '.1.3.6.1.2.1.17.4.3.1.2', # dot1dTpFdbPort
-        port2interface => '.1.3.6.1.2.1.17.1.4.1.2', # dot1dBasePortIfIndex
-    );
-    return unless $addresses;
-
     my $snmp   = $params{snmp};
     my $ports  = $params{ports};
     my $logger = $params{logger};
 
-    _addAssociatedMacAddresses(
-        ports     => $ports,
-        logger    => $logger,
-        addresses => $addresses,
+    # start with mac addresses seen on default VLAN
+    my $addresses = _getAssociatedMacAddresses(
+        snmp           => $snmp,
+        address2port   => '.1.3.6.1.2.1.17.4.3.1.2', # dot1dTpFdbPort
+        port2interface => '.1.3.6.1.2.1.17.1.4.1.2', # dot1dBasePortIfIndex
     );
+
+    if ($addresses) {
+        _addAssociatedMacAddresses(
+            ports     => $ports,
+            logger    => $logger,
+            addresses => $addresses,
+        );
+    }
 
     # add additional mac addresses for other VLANs
     $addresses = _getAssociatedMacAddresses(
-        snmp           => $params{snmp},
+        snmp           => $snmp,
         address2port   => '.1.3.6.1.2.1.17.7.1.2.2.1.2', # dot1qTpFdbPort
         port2interface => '.1.3.6.1.2.1.17.1.4.1.2',     # dot1dBasePortIfIndex
     );
@@ -1243,7 +1246,7 @@ sub _setAssociatedMacAddresses {
             $logger->debug("switching SNMP context to vlan $vlan") if $logger;
             $snmp->switch_vlan_context($vlan);
             my $mac_addresses = _getAssociatedMacAddresses(
-                snmp           => $params{snmp},
+                snmp           => $snmp,
                 address2port   => '.1.3.6.1.2.1.17.4.3.1.2', # dot1dTpFdbPort
                 port2interface => '.1.3.6.1.2.1.17.1.4.1.2', # dot1dBasePortIfIndex
             );
@@ -1351,7 +1354,7 @@ sub _setConnectedDevicesInfo {
             $logger->error(
                 "non-existing port $port_id, check CDP/LLDP mappings"
             ) if $logger;
-            last;
+            next;
         }
 
         $ports->{$port_id}->{CONNECTIONS} = {
@@ -1436,13 +1439,18 @@ sub _getConnectedDevicesInfoLLDP {
         $model->{oids}->{lldpRemSysDesc}   || '.1.0.8802.1.1.2.1.4.1.1.10'
     );
 
+    # dot1dBasePortIfIndex
+    my $port2interface = $snmp->walk('.1.3.6.1.2.1.17.1.4.1.2');
+
     # each lldp variable matches the following scheme:
     # $prefix.x.y.z = $value
-    # whereas y is the port number
+    # whereas y is either a port or an interface id
 
     while (my ($suffix, $mac) = each %{$lldpRemChassisId}) {
-        my $port_id = _getElement($suffix, -2);
-        $results->{$port_id} = {
+        my $id           = _getElement($suffix, -2);
+        my $interface_id = $params{vendor} eq 'Juniper' ?
+            $id : $port2interface->{$id};
+        $results->{$interface_id} = {
             SYSMAC   => lc(alt2canonical($mac)),
             IFDESCR  => $lldpRemPortDesc->{$suffix},
             SYSDESCR => $lldpRemSysDesc->{$suffix},

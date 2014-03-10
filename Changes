@@ -1,5 +1,38 @@
 Revision history for FusionInventory agent
 
+2.3.6 Mon, 10 Mar 2014 11:21:12 +0100
+core:
+* abort with explicit error message when there is 
+  no available task
+* when receiving a push request from a server, reschedule
+  contact for this server only
+
+inventory task:
+* fix a warning with LXC 1.0.x
+
+netinventory task:
+* fix SNMPv3 credentials handling
+* fix mac address retrieval on non-default VLANs
+* fix LLDP info retrieval for some hardware
+* fix memory exhaustion for some hardware (#2414)
+* use get-next-requests instead of get-bulk-requests, slower but safer,
+  especially with large gaps in indexes
+
+netdiscovery task:
+* fix SNMPv3 credentials handling
+* do not report errors for non-responding host with SNMPv3
+
+wake-on-lan task
+* honour all mac addresses from server request (#2353)
+
+test suite:
+* fix network interface test on Solaris (#2438)
+
+2.3.5.1 Tue, 14 Jan 2014 22:15:29 +0100
+inventory task:
+* fix AIX LVM regression introduced by incorrect fix (#2384)
+* fix another potential warning on AIX
+
 2.3.5  Tue, 14 Jan 2014 20:08:41 +0100
 netinventory task:
 * add more default OIDs for mappings undefined in SNMP model

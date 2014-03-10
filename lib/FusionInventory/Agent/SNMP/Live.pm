@@ -125,7 +125,6 @@ sub get {
 
 
     my $value = $response->{$oid};
-    chomp $value;
 
     return $value;
 }
@@ -139,6 +138,7 @@ sub walk {
 
     my $response = $session->get_table(
         -baseoid => $oid,
+        -maxrepetitions => 1,
         ($self->{context} ? (-contextname => $self->{context}) : ())
     );
 
@@ -149,7 +149,6 @@ sub walk {
 
     foreach my $oid (keys %{$response}) {
         my $value = $response->{$oid};
-        chomp $value;
         $values->{substr($oid, $offset)} = $value;
     }
 
