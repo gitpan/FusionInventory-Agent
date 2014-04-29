@@ -233,7 +233,6 @@ lib/FusionInventory/Agent/Task/Inventory/Win32/USB.pm
 lib/FusionInventory/Agent/Task/Inventory/Win32/Users.pm
 lib/FusionInventory/Agent/Task/Inventory/Win32/Videos.pm
 lib/FusionInventory/Agent/Task/NetDiscovery.pm
-lib/FusionInventory/Agent/Task/NetDiscovery/Dictionary.pm
 lib/FusionInventory/Agent/Task/NetInventory.pm
 lib/FusionInventory/Agent/Task/WakeOnLan.pm
 lib/FusionInventory/Agent/Threads.pm
@@ -243,12 +242,6 @@ lib/FusionInventory/Agent/Tools/BSD.pm
 lib/FusionInventory/Agent/Tools/Generic.pm
 lib/FusionInventory/Agent/Tools/Generic/License.pm
 lib/FusionInventory/Agent/Tools/Hardware.pm
-lib/FusionInventory/Agent/Tools/Hardware/Alcatel.pm
-lib/FusionInventory/Agent/Tools/Hardware/Axis.pm
-lib/FusionInventory/Agent/Tools/Hardware/HewlettPackard.pm
-lib/FusionInventory/Agent/Tools/Hardware/Kyocera.pm
-lib/FusionInventory/Agent/Tools/Hardware/Wyse.pm
-lib/FusionInventory/Agent/Tools/Hardware/Zebranet.pm
 lib/FusionInventory/Agent/Tools/Hostname.pm
 lib/FusionInventory/Agent/Tools/HPUX.pm
 lib/FusionInventory/Agent/Tools/Linux.pm
@@ -697,6 +690,7 @@ resources/linux/hponcfg/sample2
 resources/linux/ip/ip_addr-1
 resources/linux/ip/ip_addr-2
 resources/linux/ip/ip_addr-3
+resources/linux/ip/ip_addr-4
 resources/linux/megacli/set1_adpCount
 resources/linux/megacli/set1_EncInfo
 resources/linux/megacli/set1_PDlist
@@ -718,6 +712,7 @@ resources/linux/proc/cpuinfo/linux-686-samsung-nc10-1
 resources/linux/proc/cpuinfo/linux-alpha-1
 resources/linux/proc/cpuinfo/linux-armel-1
 resources/linux/proc/cpuinfo/linux-armel-2
+resources/linux/proc/cpuinfo/linux-armel-3
 resources/linux/proc/cpuinfo/linux-hp-dl180
 resources/linux/proc/cpuinfo/linux-ia64-1
 resources/linux/proc/cpuinfo/linux-mips-1
@@ -849,6 +844,7 @@ resources/ssl/README
 resources/virtualization/jails/sample1
 resources/virtualization/lxc/config
 resources/virtualization/lxc/lxc-info_-n_name1
+resources/virtualization/lxc/lxc-info_-n_name2
 resources/virtualization/lxc/lxc-ls_-1
 resources/virtualization/openvz/example-config-new.conf
 resources/virtualization/openvz/example-config-old.conf
@@ -979,6 +975,7 @@ t/agent/tools/hardware/dell.t
 t/agent/tools/hardware/emc.t
 t/agent/tools/hardware/epson.t
 t/agent/tools/hardware/extreme.t
+t/agent/tools/hardware/force10.t
 t/agent/tools/hardware/hewlett-packard.t
 t/agent/tools/hardware/juniper.t
 t/agent/tools/hardware/konika.t

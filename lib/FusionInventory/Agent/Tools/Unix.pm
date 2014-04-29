@@ -278,7 +278,7 @@ sub _getProcessesBusybox {
 sub _getProcessesOther {
     my (%params) = (
         command =>
-            'ps -A -o user,pid,pcpu,pmem,vsz,tty,stime,time,' .
+            'ps -A -o user,pid,pcpu,pmem,vsz,tty,etime' . ',' .
             ($OSNAME eq 'solaris' ? 'comm' : 'command'),
         @_
     );
@@ -288,15 +288,15 @@ sub _getProcessesOther {
     # skip headers
     my $line = <$handle>;
 
-    my (undef, undef, undef, $day, $month, $year) = localtime(time());
-    $year = $year + 1900;
-    $month = $month + 1;
+    # get the current timestamp
+    my $localtime = time();
 
     my @processes;
 
     while ($line = <$handle>) {
+
         next unless $line =~
-            /^
+            /^ \s*
             (\S+) \s+
             (\S+) \s+
             (\S+) \s+
@@ -304,16 +304,16 @@ sub _getProcessesOther {
             (\S+) \s+
             (\S+) \s+
             (\S+) \s+
-             \S+ \s+
-            (.*\S)
+            (\S.*\S)
             /x;
+
         my $user  = $1;
         my $pid   = $2;
         my $cpu   = $3;
         my $mem   = $4;
         my $vsz   = $5;
         my $tty   = $6;
-        my $start = $7;
+        my $etime = $7;
         my $cmd   = $8;
 
         push @processes, {
@@ -323,7 +323,7 @@ sub _getProcessesOther {
             MEM           => $mem,
             VIRTUALMEMORY => $vsz,
             TTY           => $tty,
-            STARTED       => _getProcessStartTime($start, $day, $month, $year, $pid),
+            STARTED       => _getProcessStartTime($localtime, $etime),
             CMD           => $cmd
         };
     }
@@ -358,43 +358,31 @@ my %day = (
 );
 my $monthPattern = join ('|', keys %month);
 
-# consistant time format
+# Computes a consistent process starting time from the process etime value.
 sub _getProcessStartTime {
-    my ($start, $day, $month, $year, $pid) = @_;
+    my ($localtime, $elapsedtime_string) = @_;
 
-    if ($start =~ /^(\d{1,2}):(\d{2})/) {
-        # 10:00PM
-        return sprintf("%04d-%02d-%02d %s", $year, $month, $day, $start);
-    }
+    # POSIX specifies that ps etime entry looks like [[dd-]hh:]mm:ss
+    # if either day and hour are not present then they will eat
+    # up the minutes and seconds so split on a non digit and reverse it:
+    my ($psec, $pmin, $phour, $pday) =
+        reverse(split(/\D/, $elapsedtime_string));
 
-    if ($start =~ /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)(\d{2})[AP]M/) {
-        # Sat03PM
-        my $start_day = $2;
-        return sprintf("%04d-%02d-%02d", $year, $month, $start_day);
-    }
+    # Compute a timestamp from the process etime value
+    my $elapsedtime = $psec                                +
+                      $pmin                      * 60      +
+                      ($phour ? $phour      * 60 * 60 : 0) +
+                      ($pday  ? $pday  * 24 * 60 * 60 : 0) ;
 
-    if ($start =~ /^($monthPattern)(\d{2})/) {
-        # Apr03
-        my $start_month = $month{$1};
-        my $start_day = $2;
-        return sprintf("%04d-%02d-%02d", $year, $start_month, $start_day);
-    }
+    # Substract this timestamp from the current time, creating the date at which
+    # the process was launched
+    my (undef, $min, $hour, $day, $month, $year) =
+        localtime($localtime - $elapsedtime);
 
-    if ($start =~ /^(\d{1,2})($monthPattern)\d{1,2}/) {
-        # 5Oct10
-        my $start_day = $1;
-        my $start_month = $month{$2};
-        return sprintf("%04d-%02d-%02d", $year, $start_month, $start_day);
-    }
-
-    if (-f "/proc/$pid") {
-        # this will work only on OS with /proc/$pid like Linux and FreeBSD
-        my $stat = stat("/proc/$pid");
-        my (undef, $min, $hour, $day, $month, $year) = localtime($stat->ctime());
-        $year = $year + 1900;
-        $month = $month + 1;
-        return sprintf("%04d-%02d-%02d %s:%s", $year, $month, $day, $hour, $min);
-    }
+    # Output the final date, after completing it (time + UNIX epoch)
+    $year  = $year + 1900;
+    $month = $month + 1;
+    return sprintf("%04d-%02d-%02d %02d:%02d", $year, $month, $day, $hour, $min);
 }
 
 sub getRoutingTable {

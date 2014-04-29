@@ -157,14 +157,13 @@ sub getCanonicalSize {
     my $value = $1;
     my $unit = lc($2);
 
-    use integer;
     return
-        $unit eq 'tb'    ? $value * $base * $base   :
-        $unit eq 'gb'    ? $value * $base           :
-        $unit eq 'mb'    ? $value                   :
-        $unit eq 'kb'    ? $value / ($base)         :
-        $unit eq 'bytes' ? $value / ($base * $base) :
-                           undef                    ;
+        $unit eq 'tb'    ? $value * $base * $base        :
+        $unit eq 'gb'    ? $value * $base                :
+        $unit eq 'mb'    ? $value                        :
+        $unit eq 'kb'    ? int($value / ($base))         :
+        $unit eq 'bytes' ? int($value / ($base * $base)) :
+                           undef                         ;
 }
 
 sub compareVersion {
@@ -250,9 +249,14 @@ sub getFileHandle {
             last SWITCH;
         }
         if ($params{command}) {
+            # FIXME: 'Bad file descriptor' error message on Windows
+            $params{logger}->debug2("executing $params{command}")
+                if $params{logger};
             # Turn off localised output for commands
             local $ENV{LC_ALL} = 'C';
             local $ENV{LANG} = 'C';
+            # Ignore 'Broken Pipe' warnings on Solaris
+            local $SIG{PIPE} = 'IGNORE' if $OSNAME eq 'solaris';
             if (!open $handle, '-|', $params{command} . " 2>$nowhere") {
                 $params{logger}->error(
                     "Can't run command $params{command}: $ERRNO"
