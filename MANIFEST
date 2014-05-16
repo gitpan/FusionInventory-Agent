@@ -928,6 +928,7 @@ share/sysobjectid.d-link.ids
 share/sysobjectid.dell.ids
 share/sysobjectid.epson.ids
 share/sysobjectid.extreme.ids
+share/sysobjectid.h3c.ids
 share/sysobjectid.hewlett-packard.ids
 share/sysobjectid.juniper.ids
 share/sysobjectid.konica.ids

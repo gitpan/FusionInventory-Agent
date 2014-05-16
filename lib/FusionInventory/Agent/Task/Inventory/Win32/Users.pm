@@ -59,7 +59,7 @@ sub doInventory {
     }
 
     $inventory->setHardware({
-        USERID => _getLastUser(logger => $logger)
+        LASTLOGGEDUSER => _getLastUser(logger => $logger)
     });
 }
 
@@ -160,10 +160,11 @@ sub _getLastUser {
         "SOFTWARE/Microsoft/Windows/CurrentVersion/Authentication/LogonUI/LastLoggedOnUser"
     ) {
         $user = encodeFromRegistry($machKey->{$key});
-        next unless $user;
-        $user =~ s,.*\\,,;
+        last if $user;
     }
+    return unless $user;
 
+    $user =~ s,.*\\,,;
     return $user;
 }
 

@@ -40,7 +40,7 @@ my @consumable_tests = (
     [ "Black Toner Cartridge HP Q6000A", 'TONERBLACK' ],
     [ "Black Toner [K] Cartridge", 'TONERBLACK' ],
     [ "Black Toner [K] Cartridge;SN190E8280E0000466", 'TONERBLACK' ],
-    [ "Bouteille r‚cup.", undef ],
+    [ "Bouteille rÂ‚cup.", undef ],
     [ "Canon Cartridge 718 Black", undef ],
     [ "Canon Cartridge 718 Cyan", undef ],
     [ "Canon Cartridge 718 Magenta", undef ],
@@ -131,7 +131,7 @@ my @consumable_tests = (
     [ "Maintenance Kit, Phaser 5550, P/N 115R00033(110V) / P/N 115R00034(220 V)", 'MAINTENANCEKIT' ],
     [ "Maintenance Kit, Phaser 8550, PN 108R00676", 'MAINTENANCEKIT' ],
     [ "Print Cartridge", undef ],
-    [ "Roul. s‚parateur", undef ],
+    [ "Roul. sÂ‚parateur", undef ],
     [ "Standard-Capacity Maintenance Kit, ColorQube 8570, P/N 109R00784", 'MAINTENANCEKIT' ],
     [ "Standard-Capacity Maintenance Kit, Phaser 8500/8550/8560/8560MFP, P/N 108R00675", 'MAINTENANCEKIT' ],
     [ "Staple Unit", undef ],
@@ -153,13 +153,13 @@ my @consumable_tests = (
     [ "Toner magenta", 'TONERMAGENTA' ],
     [ "Toner (Magenta)", 'TONERMAGENTA' ],
     [ "Toner noir", 'TONERBLACK' ],
-    [ "Toner usagé", undef ],
-    [ "Toner usagé 1", undef ],
-    [ "Toner usagé 2", undef ],
+    [ "Toner usagÃ©", undef ],
+    [ "Toner usagÃ© 1", undef ],
+    [ "Toner usagÃ© 2", undef ],
     [ "Toner (Yellow)", 'TONERYELLOW' ],
-    [ "Unit‚ de fusion", undef ],
+    [ "UnitÂ‚ de fusion", undef ],
     [ "Unit? de r?cup. ", undef ],
-    [ "UnitÃ© de transf", undef ],
+    [ "UnitÃƒÂ© de transf", undef ],
     [ "Waste Toner", 'WASTETONER' ],
     [ "Waste Toner Bottle CRU", 'WASTETONER' ],
     [ "Waste Toner Box", 'WASTETONER' ],
@@ -365,9 +365,9 @@ my @mac_addresses_addition_tests = (
 my @trunk_ports_extraction_tests = (
     [
         {
-            '.1.3.6.1.4.1.9.9.46.1.6.1.1.14.1.2.0' => [ 'INTEGER', 1  ],
-            '.1.3.6.1.4.1.9.9.46.1.6.1.1.14.1.2.1' => [ 'INTEGER', 0  ],
-            '.1.3.6.1.4.1.9.9.46.1.6.1.1.14.1.2.2' => [ 'INTEGER', 1  ]
+            '.1.3.6.1.4.1.9.9.46.1.6.1.1.14.0' => [ 'INTEGER', 1  ],
+            '.1.3.6.1.4.1.9.9.46.1.6.1.1.14.1' => [ 'INTEGER', 0  ],
+            '.1.3.6.1.4.1.9.9.46.1.6.1.1.14.2' => [ 'INTEGER', 1  ]
         },
         {
             0 => 1,
@@ -426,26 +426,20 @@ my $snmp2 = FusionInventory::Agent::SNMP::Mock->new(
 my %device2 = getDeviceInfo(snmp => $snmp2);
 cmp_deeply(
     \%device2,
-    { DESCRIPTION => 'foo', TYPE => 'NETWORKING', MANUFACTURER => 'Nortel' },
+    {
+        DESCRIPTION  => 'foo',
+        TYPE         => 'NETWORKING',
+        MANUFACTURER => 'Nortel',
+        VENDOR       => 'Nortel'
+    },
     'getDeviceInfo() with sysobjectid'
 );
-
-my $cdp_model = {
-    oids => {
-        cdpCacheAddress    => '.1.3.6.1.4.1.9.9.23.1.2.1.1.4',
-        cdpCacheVersion    => '.1.3.6.1.4.1.9.9.23.1.2.1.1.5',
-        cdpCacheDeviceId   => '.1.3.6.1.4.1.9.9.23.1.2.1.1.6',
-        cdpCacheDevicePort => '.1.3.6.1.4.1.9.9.23.1.2.1.1.7',
-        cdpCachePlatform   => '.1.3.6.1.4.1.9.9.23.1.2.1.1.8'
-    }
-};
 
 foreach my $test (@cdp_info_extraction_tests) {
     my $snmp  = FusionInventory::Agent::SNMP::Mock->new(hash => $test->[0]);
 
     my $cdp_info = FusionInventory::Agent::Tools::Hardware::_getConnectedDevicesInfoCDP(
         snmp  => $snmp,
-        model => $cdp_model,
     );
 
     cmp_deeply(
@@ -486,18 +480,11 @@ foreach my $test (@mac_addresses_addition_tests) {
     );
 }
 
-my $trunk_model = {
-    oids => {
-        vlanTrunkPortDynamicStatus => '.1.3.6.1.4.1.9.9.46.1.6.1.1.14'
-    }
-};
-
 foreach my $test (@trunk_ports_extraction_tests) {
     my $snmp = FusionInventory::Agent::SNMP::Mock->new(hash => $test->[0]);
 
     my $trunk_ports = FusionInventory::Agent::Tools::Hardware::_getTrunkPorts(
         snmp  => $snmp,
-        model => $trunk_model,
     );
 
     cmp_deeply(
