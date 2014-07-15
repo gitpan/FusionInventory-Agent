@@ -3,6 +3,8 @@ package FusionInventory::Agent::Task::Inventory::Solaris::Bios;
 use strict;
 use warnings;
 
+use Config;
+
 use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Solaris;
 
@@ -18,18 +20,15 @@ sub doInventory {
     my $inventory = $params{inventory};
     my $logger    = $params{logger};
 
+    my $arch = $Config{Archname} =~ /^i86pc/ ? 'i386' : 'sparc';
+
     my ($bios, $hardware);
 
     if (getZone() eq 'global') {
-        my $arch;
         if (canRun('showrev')) {
             my $infos = _parseShowRev(logger => $logger);
             $bios->{SMODEL}        = $infos->{'Application architecture'};
             $bios->{SMANUFACTURER} = $infos->{'Hardware provider'};
-            $arch               = $infos->{'Application architecture'};
-        } else {
-            $arch =
-                getFirstLine(command => 'arch') eq 'i86pc' ? 'i386' : 'unknown';
         }
 
         if ($arch eq "i386") {
@@ -50,7 +49,7 @@ sub doInventory {
             $bios->{MMODEL}        = $motherboardInfos->{'Product'};
             $bios->{MSN}           = $motherboardInfos->{'Serial Number'};
             $bios->{MMANUFACTURER} = $motherboardInfos->{'Manufacturer'};
-        } elsif ($arch =~ /sparc/i) {
+        } else {
             my $infos = _parsePrtconf(logger => $logger);
             $bios->{SMODEL} = $infos->{'banner-name'};
             $bios->{SMODEL} .= " ($infos->{name})" if $infos->{name};
@@ -71,11 +70,23 @@ sub doInventory {
                 command => $command,
                 logger  => $logger
             );
+
+            $hardware->{UUID} = _getUUID(
+                command => '/usr/sbin/zoneadm -z global list -p',
+                logger  => $logger
+            );
         }
     } else {
         my $infos = _parseShowRev(logger => $logger);
         $bios->{SMANUFACTURER} = $infos->{'Hardware provider'};
         $bios->{SMODEL}        = "Solaris Containers";
+
+        if ($arch eq 'sparc') {
+            $hardware->{UUID} = _getUUID(
+                command => '/usr/sbin/zoneadm list -p',
+                logger  => $logger
+            )
+        }
     }
 
     $inventory->setBios($bios);
@@ -145,6 +156,21 @@ sub _parsePrtconf {
     close $handle;
 
     return $infos;
+}
+
+sub _getUUID {
+    my (%params) = (
+        command => '/usr/sbin/zoneadm list -p',
+        @_
+    );
+
+    my $line = getFirstLine(%params);
+    return unless $line;
+
+    my @info = split(/:/, $line);
+    my $uuid = $info[4];
+
+    return $uuid;
 }
 
 1;

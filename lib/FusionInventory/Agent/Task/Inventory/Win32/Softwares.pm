@@ -60,7 +60,7 @@ sub doInventory {
             inventory => $inventory,
             is64bit   => 1,
             logger    => $logger
-        );
+        ) if $params{scan_profiles};
 
         my $machKey32 = $Registry->Open('LMachine', {
             Access => KEY_READ | KEY_WOW64_32 ## no critic (ProhibitBitwise)
@@ -84,7 +84,7 @@ sub doInventory {
             inventory => $inventory,
             is64bit   => 0,
             logger    => $logger
-        );
+        ) if $params{scan_profiles};
     } else {
         my $machKey = $Registry->Open('LMachine', {
             Access => KEY_READ
@@ -107,7 +107,7 @@ sub doInventory {
             inventory => $inventory,
             is64bit   => 0,
             logger    => $logger
-        );
+        ) if $params{scan_profiles};
 
     }
 
@@ -291,6 +291,7 @@ sub _processMSIE {
     my $name = $params{is64bit} ?
         "Internet Explorer (64bit)" : "Internet Explorer";
     my $version =
+        $params{machKey}->{"SOFTWARE/Microsoft/Internet Explorer/svcVersion"} ||
         $params{machKey}->{"SOFTWARE/Microsoft/Internet Explorer/Version"};
 
     return unless $version; # Not installed

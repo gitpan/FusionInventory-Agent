@@ -25,56 +25,7 @@ my %types = (
     7 => 'VIDEO',
 );
 
-# http://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
-my %sysobjectid_manufacturers = (
-    2     => { manufacturer => 'IBM',             type => 'COMPUTER'   },
-    9     => { manufacturer => 'Cisco',           type => 'NETWORKING' },
-    11    => { manufacturer => 'Hewlett-Packard'                       },
-    23    => { manufacturer => 'Novell',          type => 'COMPUTER'   },
-    36    => { manufacturer => 'DEC',             type => 'COMPUTER'   },
-    42    => { manufacturer => 'Sun',             type => 'COMPUTER'   },
-    43    => { manufacturer => '3Com',            type => 'NETWORKING' },
-    45    => { manufacturer => 'Nortel',          type => 'NETWORKING' },
-    63    => { manufacturer => 'Apple',                                },
-    171   => { manufacturer => 'D-Link',          type => 'NETWORKING' },
-    186   => { manufacturer => 'Toshiba',         type => 'PRINTER'    },
-    207   => { manufacturer => 'Allied',          type => 'NETWORKING' },
-    236   => { manufacturer => 'Samsung',         type => 'PRINTER'    },
-    253   => { manufacturer => 'Xerox',           type => 'PRINTER'    },
-    289   => { manufacturer => 'Brocade',         type => 'NETWORKING' },
-    367   => { manufacturer => 'Ricoh',           type => 'PRINTER'    },
-    368   => { manufacturer => 'Axis',            type => 'NETWORKING' },
-    534   => { manufacturer => 'Eaton',           type => 'NETWORKING' },
-    637   => { manufacturer => 'Alcatel-Lucent',  type => 'NETWORKING' },
-    641   => { manufacturer => 'Lexmark',         type => 'PRINTER'    },
-    674   => { manufacturer => 'Dell'                                  },
-    714   => { manufacturer => 'Wyse',            type => 'PRINTER'    },
-    1139  => { manufacturer => 'EMC',             type => 'STORAGE'    },
-    1248  => { manufacturer => 'Epson',           type => 'PRINTER'    },
-    1347  => { manufacturer => 'Kyocera',         type => 'PRINTER'    },
-    1602  => { manufacturer => 'Canon',           type => 'PRINTER'    },
-    1805  => { manufacturer => 'Sagem',           type => 'NETWORKING' },
-    1872  => { manufacturer => 'Alteon',          type => 'NETWORKING' },
-    1916  => { manufacturer => 'Extreme',         type => 'NETWORKING' },
-    1981  => { manufacturer => 'EMC',             type => 'STORAGE'    },
-    1991  => { manufacturer => 'Foundry',         type => 'NETWORKING' },
-    2385  => { manufacturer => 'Sharp',           type => 'PRINTER'    },
-    2435  => { manufacturer => 'Brother',         type => 'PRINTER'    },
-    2636  => { manufacturer => 'Juniper',         type => 'NETWORKING' },
-    2699  => { manufacturer => 'Axis',            type => 'PRINTER'    },
-    3224  => { manufacturer => 'NetScreen',       type => 'NETWORKING' },
-    3977  => { manufacturer => 'Broadband',       type => 'NETWORKING' },
-    5596  => { manufacturer => 'Tandberg',        type => 'VIDEO'      },
-    6027  => { manufacturer => 'Force10',         type => 'NETWORKING' },
-    6486  => { manufacturer => 'Alcatel',         type => 'NETWORKING' },
-    6889  => { manufacturer => 'Avaya',           type => 'NETWORKING' },
-    10418 => { manufacturer => 'Avocent'                               },
-    16885 => { manufacturer => 'Nortel',          type => 'NETWORKING' },
-    18334 => { manufacturer => 'Konica',          type => 'PRINTER'    },
-    25506 => { manufacturer => 'H3C',             type => 'NETWORKING' },
-);
-
-my %sysobjectid_models;
+my %sysobjectid;
 
 my %sysdescr_first_word = (
     '3com'           => { vendor => '3Com',            type => 'NETWORKING' },
@@ -249,6 +200,8 @@ my %interface_variables = (
     },
 );
 
+my %consumables;
+
 my @consumable_type_rules = (
     {
         match => qr/cyan/i,
@@ -273,6 +226,14 @@ my @consumable_type_rules = (
     {
         match => qr/maintenance/i,
         value => 'maintenance'
+    },
+    {
+        match => qr/fuser/i,
+        value => 'fuser'
+    },
+    {
+        match => qr/transfer/i,
+        value => 'transfer'
     },
 );
 
@@ -314,6 +275,8 @@ my %consumable_variables_from_type = (
     },
     waste       => 'WASTETONER',
     maintenance => 'MAINTENANCEKIT',
+    fuser       => 'FUSERKIT',
+    transfer    => 'TRANSFERKIT',
 );
 
 # printer-specific page counter variables
@@ -345,26 +308,13 @@ sub getDeviceInfo {
     # manufacturer, type and model identification attempt, using sysObjectID
     my $sysobjectid = $snmp->get('.1.3.6.1.2.1.1.2.0');
     if ($sysobjectid) {
-        my $prefix = qr/(?:
-            SNMPv2-SMI::enterprises |
-            iso\.3\.6\.1\.4\.1      |
-            \.1\.3\.6\.1\.4\.1
-        )/x;
-        my ($manufacturer_id, $model_id) =
-            $sysobjectid =~ /^ $prefix \. (\d+) (?: \. (.+) )? $/x;
-        if ($manufacturer_id) {
-            my $result = $sysobjectid_manufacturers{$manufacturer_id};
-            if ($result) {
-                $result->{model} = _getDeviceModel(
-                    manufacturer => $result->{manufacturer},
-                    id           => $model_id,
-                    datadir      => $datadir,
-                );
-                $device{MANUFACTURER} = $result->{manufacturer};
-                $device{TYPE}         = $result->{type}  if $result->{type};
-                $device{MODEL}        = $result->{model} if $result->{model};
-            }
-        }
+        my ($manufacturer, $type, $model) = _getSysObjectIDInfo(
+            id      => $sysobjectid,
+            datadir => $datadir
+        );
+        $device{MANUFACTURER} = $manufacturer if $manufacturer;
+        $device{TYPE}         = $type         if $type;
+        $device{MODEL}        = $model        if $model;
     }
 
     # vendor and type identification attempt, using sysDescr
@@ -453,39 +403,71 @@ sub getDeviceInfo {
     return %device;
 }
 
-sub _getDeviceModel {
+sub _getSysObjectIDInfo {
     my (%params) = @_;
 
     return unless $params{id};
 
-    # load vendor-specific database if not already done
-    my $manufacturer = lc($params{manufacturer});
-    $manufacturer =~ s/ /_/g;
-    $sysobjectid_models{$manufacturer} = _loadDeviceModels(
-        file => "$params{datadir}/sysobjectid.$manufacturer.ids"
-    ) if !exists $sysobjectid_models{$manufacturer};
+    _loadSysObjectIDDatabase(%params) if !%sysobjectid;
 
-    return $sysobjectid_models{$manufacturer}->{$params{id}};
+    my $prefix = qr/(?:
+        SNMPv2-SMI::enterprises |
+        iso\.3\.6\.1\.4\.1      |
+        \.1\.3\.6\.1\.4\.1
+    )/x;
+    my ($manufacturer_id, $model_id) =
+        $params{id} =~ /^ $prefix \. (\d+) (?: \. (.+) )? $/x;
+
+    return unless $manufacturer_id;
+    return unless $sysobjectid{$manufacturer_id};
+
+    my ($manufacturer, $type, $model);
+    $manufacturer = $sysobjectid{$manufacturer_id}->{manufacturer};
+    $type         = $sysobjectid{$manufacturer_id}->{type};
+    $model        = $sysobjectid{$manufacturer_id}->{devices}->{$model_id}
+        if $model_id;
+
+    return ($manufacturer, $type, $model);
 }
 
-sub _loadDeviceModels {
+sub _loadSysObjectIDDatabase {
     my (%params) = @_;
 
-    my $handle = getFileHandle(%params);
+    return unless $params{datadir};
+
+    my $handle = getFileHandle(file => "$params{datadir}/sysobject.ids");
     return unless $handle;
 
-    my $models;
-
+    my $manufacturer_id;
     while (my $line = <$handle>) {
-        chomp $line;
-        my ($id, $name) = split(/\t/, $line);
-        next unless $id;
-        $models->{$id} = $name;
+        if ($line =~ /^\t ([\d.]+) \t (.+)/x) {
+            $sysobjectid{$manufacturer_id}->{devices}->{$1} = $2;
+        }
+
+        if ($line =~ /^(\d+) \t (\S+) (?:\t (\S+))?/x) {
+            $manufacturer_id = $1;
+            $sysobjectid{$manufacturer_id}->{manufacturer} = $2;
+            $sysobjectid{$manufacturer_id}->{type}         = $3;
+        }
     }
 
     close $handle;
+}
 
-    return $models;
+sub _loadConsumablesDatabase {
+    my (%params) = @_;
+
+    return unless $params{datadir};
+
+    my $handle = getFileHandle(file => "$params{datadir}/consumables.ids");
+    return unless $handle;
+
+    while (my $line = <$handle>) {
+        next unless $line =~ /(\S+) \t (\S+)/x;
+        $consumables{$1} = $2;
+    }
+
+    close $handle;
 }
 
 sub _getSerial {
@@ -607,15 +589,17 @@ sub getDeviceFullInfo {
     );
 
     _setPrinterProperties(
-        device => $device,
-        snmp   => $snmp,
-        logger => $logger
+        device  => $device,
+        snmp    => $snmp,
+        logger  => $logger,
+        datadir => $params{datadir}
     ) if $info{TYPE} && $info{TYPE} eq 'PRINTER';
 
     _setNetworkingProperties(
         device  => $device,
         snmp    => $snmp,
-        logger  => $logger
+        logger  => $logger,
+        datadir => $params{datadir}
     ) if $info{TYPE} && $info{TYPE} eq 'NETWORKING';
 
     # convert ports hashref to an arrayref, sorted by interface number
@@ -683,9 +667,9 @@ sub _setGenericProperties {
         # safety checks
         if (! exists $ports->{$value}) {
             $logger->error(
-                "invalid interface ID $value while setting IP address, aborting"
+                "no interface with ID $value for IP address $suffix, ignoring"
             ) if $logger;
-            last;
+            next;
         }
         if ($suffix !~ /^$ip_address_pattern$/) {
             $logger->error("invalid IP address $suffix") if $logger;
@@ -716,15 +700,22 @@ sub _setPrinterProperties {
         my $current = $snmp->get($current_oid);
         next unless defined $max and defined $current;
 
-        my $value = $current == -3 ?
-            100 : _getPercentValue($max, $current);
-        next unless defined $value;
-
         # consumable identification
         my $variable =
-            _getConsumableVariableFromDescription($description);
-
+            _getConsumableVariableFromDescription(
+                datadir     => $params{datadir},
+                description => $description
+            );
         next unless $variable;
+
+        my $value;
+        if ($current == -3) {
+            # OK means 100% for a container, but 0% for a receptacle
+            $value = $variable eq 'WASTETONER' ? 0 : 100;
+        } else {
+            $value = _getPercentValue($max, $current);
+        }
+        next unless defined $value;
 
         $device->{CARTRIDGES}->{$variable} = $value;
     }
@@ -744,7 +735,16 @@ sub _setPrinterProperties {
 }
 
 sub _getConsumableVariableFromDescription {
-    my ($description) = @_;
+    my (%params) = @_;
+
+    my $description = $params{description};
+    return unless $description;
+
+    _loadConsumablesDatabase(%params) if !%consumables;
+
+    foreach my $key (keys %consumables) {
+        return $consumables{$key} if $description =~ /$key/;
+    }
 
     # find type
     my $type;
