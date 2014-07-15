@@ -210,7 +210,8 @@ data_install :
 	install -d -m 755 $(DESTDIR)$(DATADIR)
 	install -m 644 share/pci.ids $(DESTDIR)$(DATADIR)/
 	install -m 644 share/usb.ids $(DESTDIR)$(DATADIR)/
-	install -m 644 share/sysobjectid.*.ids $(DESTDIR)$(DATADIR)/
+	install -m 644 share/sysobject.ids $(DESTDIR)$(DATADIR)/
+	install -m 644 share/consumables.ids $(DESTDIR)$(DATADIR)/
 	install -d -m 755 $(DESTDIR)$(DATADIR)/html
 	install -m 644 share/html/* $(DESTDIR)$(DATADIR)/html
 EOF
