@@ -8,9 +8,9 @@ use FusionInventory::Agent::Tools;
 sub isEnabled {
     my (%params) = @_;
 
-    return
-        !$params{no_category}->{software} &&
-        canRun('pkg_info');
+    return if $params{no_category}->{software};
+
+    return canRun('pkg_info') || canRun('pkg');
 }
 
 sub doInventory {
@@ -19,10 +19,10 @@ sub doInventory {
     my $inventory = $params{inventory};
     my $logger    = $params{logger};
 
-    my $command = 'pkg_info';
-    my $packages = _getPackagesListFromPkgInfo(
-        logger => $logger, command => $command
-    );
+    my $packages =
+        _getPackagesList(logger => $logger, command => 'pkg_info') ||
+        _getPackagesList(logger => $logger, command => 'pkg info');
+    return unless $packages;
 
     foreach my $package (@$packages) {
         $inventory->addEntry(
@@ -32,8 +32,9 @@ sub doInventory {
     }
 }
 
-sub _getPackagesListFromPkgInfo {
+sub _getPackagesList {
     my $handle = getFileHandle(@_);
+    return unless $handle;
 
     my @packages;
     while (my $line = <$handle>) {
@@ -47,7 +48,7 @@ sub _getPackagesListFromPkgInfo {
 
     close $handle;
 
-    return \@packages;
+    return @packages ? \@packages : undef;
 }
 
 1;

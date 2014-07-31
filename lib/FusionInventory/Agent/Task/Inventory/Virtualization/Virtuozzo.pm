@@ -4,12 +4,30 @@ use strict;
 use warnings;
 
 use FusionInventory::Agent::Tools;
+use FusionInventory::Agent::Tools::Network;
 
 sub isEnabled {
     # Avoid duplicated entry with libvirt
     return if canRun('virsh');
 
     return canRun('vzlist');
+}
+
+sub getMACs {
+    my ($ctid, $logger) = @_;
+
+    my @ipLines = getAllLines(
+            command => "vzctl exec '$ctid' 'ip -0 a'",
+            logger  => $logger
+            );
+
+    my @macs;
+    foreach my $line (@ipLines) {
+        next unless $line =~ /^\s+link\/ether ($mac_address_pattern)\s/;
+        push @macs, $1;
+    }
+
+    return join('/', @macs);
 }
 
 sub doInventory {
@@ -31,10 +49,10 @@ sub doInventory {
     while (my $line = <$handle>) {
 
         chomp $line;
-        my ($name, $uuid, $cpus, $status, $subsys) = split(/[ \t]+/, $line);
+        my ($name, $ctid, $cpus, $status, $subsys) = split(/[ \t]+/, $line);
 
         my $memory = getFirstMatch(
-            file    => "/etc/vz/conf/$uuid.conf",
+            file    => "/etc/vz/conf/$ctid.conf",
             pattern => qr/^SLMMEMORYLIMIT="\d+:(\d+)"$/,
             logger  => $logger,
             );
@@ -42,7 +60,7 @@ sub doInventory {
             $memory = $memory / 1024 / 1024;
         } else {
             $memory = getFirstMatch(
-                file    => "/etc/vz/conf/$uuid.conf",
+                file    => "/etc/vz/conf/$ctid.conf",
                 pattern => qr/^PRIVVMPAGES="\d+:(\d+)"$/,
                 logger  => $logger,
                 );
@@ -50,7 +68,7 @@ sub doInventory {
                 $memory = $memory * 4 / 1024;
             } else {
                 $memory = getFirstMatch(
-                    file    => "/etc/vz/conf/$uuid.conf",
+                    file    => "/etc/vz/conf/$ctid.conf",
                     pattern => qr/^PHYSPAGES="\d+:(\d+\w{0,1})"$/,
                     logger  => $logger,
                     );
@@ -74,11 +92,12 @@ sub doInventory {
             entry => {
                 NAME      => $name,
                 VCPU      => $cpus,
-                UUID      => $uuid,
+                UUID      => $ctid,
                 MEMORY    => $memory,
                 STATUS    => $status,
                 SUBSYSTEM => $subsys,
                 VMTYPE    => "Virtuozzo",
+                MAC       => getMACs($ctid, $logger)
             }
         );
 

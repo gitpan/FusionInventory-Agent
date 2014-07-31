@@ -195,6 +195,7 @@ lib/FusionInventory/Agent/Task/Inventory/Solaris/Softwares.pm
 lib/FusionInventory/Agent/Task/Inventory/Solaris/Storages.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Hpvm.pm
+lib/FusionInventory/Agent/Task/Inventory/Virtualization/HyperV.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Jails.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Libvirt.pm
 lib/FusionInventory/Agent/Task/Inventory/Virtualization/Lxc.pm
@@ -437,6 +438,7 @@ resources/bsd/fstab/freebsd-1
 resources/bsd/lsvfs/freebsd-8.1
 resources/bsd/mount/dragonfly-1
 resources/bsd/pkg_info/sample1
+resources/bsd/pkg_info/sample2
 resources/bsd/storages/mfiutil
 resources/config/sample1
 resources/config/sample2
@@ -705,6 +707,7 @@ resources/linux/mpt-status/sample1
 resources/linux/mpt-status/sample2
 resources/linux/packaging/dpkg
 resources/linux/packaging/rpm
+resources/linux/proc/1-environ.txt
 resources/linux/proc/cpuinfo/cpuinfo-vmware-esx
 resources/linux/proc/cpuinfo/esx
 resources/linux/proc/cpuinfo/linux-2.6.35-1-core-2-thread
@@ -860,6 +863,7 @@ resources/virtualization/virsh/dumpxml1
 resources/virtualization/virsh/dumpxml2
 resources/virtualization/virsh/dumpxml3
 resources/virtualization/virsh/dumpxml4
+resources/virtualization/virsh/dumpxml5_lxc
 resources/virtualization/virsh/list1
 resources/virtualization/virsh/list2
 resources/virtualization/xm/xm_list
@@ -899,6 +903,7 @@ resources/win32/wmi/7-Win32_NetworkAdapterConfiguration.wmi
 resources/win32/wmi/7-Win32_PhysicalMemory.wmi
 resources/win32/wmi/7-Win32_PhysicalMemoryArray.wmi
 resources/win32/wmi/7-Win32_Processor.wmi
+resources/win32/wmi/unknown-MSVM_ComputerSystem.wmi
 resources/win32/wmi/win7-sp1-x64-Win32_LogicalDisk.wmi
 resources/win32/wmi/win7-sp1-x64-Win32_OperatingSystem.wmi
 resources/win32/wmi/winxp-sp3-x86-Win32_LogicalDisk.wmi
@@ -1073,6 +1078,7 @@ t/tasks/inventory/solaris/memory.t
 t/tasks/inventory/solaris/networks.t
 t/tasks/inventory/solaris/slots.t
 t/tasks/inventory/solaris/storages.t
+t/tasks/inventory/virtualization/hyperv.t
 t/tasks/inventory/virtualization/jails.t
 t/tasks/inventory/virtualization/libvirt.t
 t/tasks/inventory/virtualization/lxc.t

@@ -79,8 +79,9 @@ sub doInventory {
     my $vmid = $type eq 'Virtuozzo' ?
         _getOpenVZVmID(logger => $logger) : undef;
 
-    my $uuid = $type eq 'Xen' ?
-        _getXenUUID(logger => $logger) : undef;
+    my $uuid = $type eq 'Xen' ? _getXenUUID(logger => $logger) :
+               $type eq 'LXC' ? _getLibvirtLXC_UUID(logger => $logger) :
+               undef;
 
     $inventory->setHardware({
         VMSYSTEM => $type,
@@ -126,10 +127,8 @@ sub _getType {
             logger => $logger
         );
         my $line = <$handle>;
-        if ($line && $line =~ /1/) {
-             return 'BSDJail';
-        }
         close $handle;
+        return 'BSDJail' if $line && $line == 1;
     }
 
     # loaded modules
@@ -185,7 +184,7 @@ sub _getType {
         file    => '/proc/1/environ',
         pattern => qr/container=lxc/
     )) {
-        return 'LXC';
+        return 'lxc';
     }
 
     # OpenVZ
@@ -236,6 +235,27 @@ sub _getXenUUID {
         file => '/sys/hypervisor/uuid',
         @_
     );
+}
+
+sub _getLibvirtLXC_UUID {
+    my (%params) = (
+        file => '/proc/1/environ',
+        @_
+    );
+
+    my @environ = split( '\0', getAllLines( %params ) );
+
+    my $uuid;
+
+    my $hardware;
+    foreach my $var (@environ) {
+      if ( $var =~ /^LIBVIRT_LXC_UUID/) {
+        my ( $name, $value ) = split( '=', $var );
+        $uuid = $value;
+      }
+    }
+
+    return $uuid;
 }
 
 1;

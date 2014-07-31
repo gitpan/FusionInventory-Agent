@@ -41,17 +41,24 @@ sub _getInterfaces {
 
     my $logger = $params{logger};
 
-    # get a first list of interfaces objects from lscfg
-    my @interfaces = _parseLscfg(
-        command => 'lscfg -v -l en*',
-        logger  => $logger
-    );
-
-    # complete with empty interfaces objects from ifconfig
-    push @interfaces,
+    # get a list of interfaces from ifconfig
+    my @interfaces =
         map { { DESCRIPTION => $_ } }
         split(/ /, getFirstLine(command => 'ifconfig -l'));
 
+    # complete with hardware addresses, extracted from lscfg
+    my %addresses = _parseLscfg(
+        command => 'lscfg -v -l ent*',
+        logger  => $logger
+    );
+
+    foreach my $interface (@interfaces) {
+        next unless $addresses{$interface->{DESCRIPTION}};
+        $interface->{TYPE}    = 'ethernet';
+        $interface->{MACADDR} = $addresses{$interface->{DESCRIPTION}};
+    }
+
+    # complete with network information, extracted from lsattr
     foreach my $interface (@interfaces) {
         my $handle = getFileHandle(
             command => "lsattr -E -l $interface->{DESCRIPTION}",
@@ -87,26 +94,19 @@ sub _parseLscfg {
     my $handle = getFileHandle(@_);
     return unless $handle;
 
-    my @interfaces;
-    my $interface;
+    my %addresses;
+    my $current_interface;
     while (my $line = <$handle>) {
         if ($line =~ /^\s+ ent(\d+) \s+ \S+ \s+/x) {
-            push @interfaces, $interface if $interface;
-            undef $interface;
-            # quick assertion: nothing else as ethernet interface
-            $interface = {
-                DESCRIPTION => "en$1",
-                TYPE        => 'ethernet'
-            };
+            $current_interface = "en$1";
         }
         if ($line =~ /Network Address\.+($alt_mac_address_pattern)/) {
-            $interface->{MACADDR} = alt2canonical($1);
+            $addresses{$current_interface} = alt2canonical($1);
         }
     }
     close $handle;
-    push @interfaces, $interface if $interface;
 
-    return @interfaces;
+    return %addresses;
 }
 
 1;

@@ -23,6 +23,7 @@ my %types = (
     5 => 'POWER',
     6 => 'PHONE',
     7 => 'VIDEO',
+    8 => 'KVM',
 );
 
 my %sysobjectid;
@@ -56,13 +57,13 @@ my %sysdescr_first_word = (
     'foundry'        => { vendor => 'Foundry',         type => 'NETWORKING' },
     'fuji'           => { vendor => 'Fuji',            type => 'NETWORKING' },
     'h3c'            => { vendor => 'H3C',             type => 'NETWORKING' },
-    'hp'             => { vendor => 'Hewlett-Packard', type => 'PRINTER'    },
+    'hp'             => { vendor => 'Hewlett-Packard',                      },
     'ibm'            => { vendor => 'IBM',             type => 'COMPUTER'   },
     'juniper'        => { vendor => 'Juniper',         type => 'NETWORKING' },
     'konica'         => { vendor => 'Konica',          type => 'PRINTER'    },
     'kyocera'        => { vendor => 'Kyocera',         type => 'PRINTER'    },
     'lexmark'        => { vendor => 'Lexmark',         type => 'PRINTER'    },
-    'netapp'         => { vendor => 'NetApp',                               },
+    'netapp'         => { vendor => 'NetApp',          type => 'STORAGE'    },
     'netgear'        => { vendor => 'NetGear',         type => 'NETWORKING' },
     'nortel'         => { vendor => 'Nortel',          type => 'NETWORKING' },
     'nrg'            => { vendor => 'NRG',             type => 'PRINTER'    },
@@ -91,6 +92,11 @@ my @sysdescr_rules = (
     {
         match => qr/JETDIRECT/,
         type  => 'PRINTER',
+    },
+    {
+        match  => qr/Linux TS-\d+/,
+        type   => 'STORAGE',
+        vendor => 'Qnap'
     },
 );
 
@@ -302,6 +308,7 @@ sub getDeviceInfo {
 
     my $snmp    = $params{snmp};
     my $datadir = $params{datadir};
+    my $logger  = $params{logger};
 
     my %device;
 
@@ -310,7 +317,8 @@ sub getDeviceInfo {
     if ($sysobjectid) {
         my ($manufacturer, $type, $model) = _getSysObjectIDInfo(
             id      => $sysobjectid,
-            datadir => $datadir
+            datadir => $datadir,
+            logger  => $logger
         );
         $device{MANUFACTURER} = $manufacturer if $manufacturer;
         $device{TYPE}         = $type         if $type;
@@ -322,7 +330,7 @@ sub getDeviceInfo {
     if ($sysdescr) {
 
         # first word
-        my ($first_word) = $sysdescr =~ /^(\S+)/;
+        my ($first_word) = $sysdescr =~ /(\S+)/;
         my $result = $sysdescr_first_word{lc($first_word)};
 
         if ($result) {
@@ -340,13 +348,21 @@ sub getDeviceInfo {
         $device{DESCRIPTION} = $sysdescr;
     }
 
-    # fallback model identification attempt, using type-specific OID
-    if (!exists $device{MODEL} && exists $device{TYPE}) {
-        my $type = $device{TYPE};
-        my $model =
-            $type eq 'PRINTER'    ? $snmp->get('.1.3.6.1.2.1.25.3.2.1.3.1')    :
-            $type eq 'NETWORKING' ? $snmp->get('.1.3.6.1.2.1.47.1.1.1.1.13.1') :
-                                    undef;
+    # fallback type identification attempt, using type-specific OID presence
+    if (!exists $device{TYPE}) {
+         if (
+             $snmp->get('.1.3.6.1.2.1.43.11.1.1.6.1.1') ||
+             $snmp->get('.1.3.6.1.2.1.25.3.2.1.3.1')
+         ) {
+            $device{TYPE} = 'PRINTER'
+        }
+    }
+
+    # fallback model identification attempt, using type-specific OID value
+    if (!exists $device{MODEL}) {
+        my $model = exists $device{TYPE} && $device{TYPE} eq 'PRINTER' ?
+            $snmp->get('.1.3.6.1.2.1.25.3.2.1.3.1')    :
+            $snmp->get('.1.3.6.1.2.1.47.1.1.1.1.13.1') ;
         $device{MODEL} = $model if $model;
     }
 
@@ -410,24 +426,52 @@ sub _getSysObjectIDInfo {
 
     _loadSysObjectIDDatabase(%params) if !%sysobjectid;
 
+    my $logger = $params{logger};
     my $prefix = qr/(?:
         SNMPv2-SMI::enterprises |
         iso\.3\.6\.1\.4\.1      |
         \.1\.3\.6\.1\.4\.1
     )/x;
-    my ($manufacturer_id, $model_id) =
+    my ($manufacturer_id, $device_id) =
         $params{id} =~ /^ $prefix \. (\d+) (?: \. (.+) )? $/x;
 
-    return unless $manufacturer_id;
-    return unless $sysobjectid{$manufacturer_id};
+    # no match
+    if (!$manufacturer_id) {
+        $logger->debug(
+            "no match in sysobjectID database: " .
+            "no manufacturer ID"
+        ) if $logger;
+        return ();
+    }
 
-    my ($manufacturer, $type, $model);
-    $manufacturer = $sysobjectid{$manufacturer_id}->{manufacturer};
-    $type         = $sysobjectid{$manufacturer_id}->{type};
-    $model        = $sysobjectid{$manufacturer_id}->{devices}->{$model_id}
-        if $model_id;
+    my $manufacturer = $sysobjectid{$manufacturer_id};
+    if (!$manufacturer) {
+        $logger->debug(
+            "no match in sysobjectID database: " .
+            "unknown manufacturer ID $manufacturer_id"
+        ) if $logger;
+        return ();
+    }
 
-    return ($manufacturer, $type, $model);
+    if (!$device_id) {
+        $logger->debug(
+            "partial match in sysobjectID database: " .
+            "no device ID"
+        ) if $logger;
+        return ($manufacturer->{name}, $manufacturer->{type});
+    }
+
+    my $device = $manufacturer->{devices}->{$device_id};
+    if (!$device) {
+        $logger->debug(
+            "partial match in sysobjectID database: " .
+            "unknown device ID $device_id"
+        ) if $logger;
+        return ($manufacturer->{name}, $manufacturer->{type});
+    }
+
+    $logger->debug("full match in sysobjectID database");
+    return ($manufacturer->{name}, $device->{type}, $device->{name});
 }
 
 sub _loadSysObjectIDDatabase {
@@ -440,14 +484,15 @@ sub _loadSysObjectIDDatabase {
 
     my $manufacturer_id;
     while (my $line = <$handle>) {
-        if ($line =~ /^\t ([\d.]+) \t (.+)/x) {
-            $sysobjectid{$manufacturer_id}->{devices}->{$1} = $2;
+        if ($line =~ /^\t ([\d.]+) \t ([^\t]*) (?:\t (\S+))?/x) {
+            $sysobjectid{$manufacturer_id}->{devices}->{$1}->{name} = $2;
+            $sysobjectid{$manufacturer_id}->{devices}->{$1}->{type} = $3;
         }
 
         if ($line =~ /^(\d+) \t (\S+) (?:\t (\S+))?/x) {
             $manufacturer_id = $1;
-            $sysobjectid{$manufacturer_id}->{manufacturer} = $2;
-            $sysobjectid{$manufacturer_id}->{type}         = $3;
+            $sysobjectid{$manufacturer_id}->{name} = $2;
+            $sysobjectid{$manufacturer_id}->{type} = $3;
         }
     }
 
@@ -667,7 +712,7 @@ sub _setGenericProperties {
         # safety checks
         if (! exists $ports->{$value}) {
             $logger->error(
-                "no interface with ID $value for IP address $suffix, ignoring"
+                "unknown interface $value for IP address $suffix, ignoring"
             ) if $logger;
             next;
         }
@@ -781,32 +826,11 @@ sub _setNetworkingProperties {
 
     my $ports    = $device->{PORTS}->{PORT};
 
-    my $vlans = $snmp->walk('.1.3.6.1.4.1.9.9.46.1.3.1.1.4.1');
-
-    # Detect VLAN
-    my $results = $snmp->walk('.1.3.6.1.4.1.9.9.68.1.2.2.1.2');
-    # each result matches either of the following schemes:
-    # $prefix.$i.$j = $value, with $j as port id, and $value as vlan id
-    # $prefix.$i    = $value, with $i as port id, and $value as vlan id
-    foreach my $suffix (sort keys %{$results}) {
-        my $port_id = _getElement($suffix, -1);
-        my $vlan_id = $results->{$suffix};
-        my $name    = $vlans->{$vlan_id};
-
-        # safety check
-        if (! exists $ports->{$port_id}) {
-            $logger->error(
-                "invalid interface ID $port_id while setting vlans, aborting"
-            ) if $logger;
-            last;
-        }
-        push
-            @{$ports->{$port_id}->{VLANS}->{VLAN}},
-                {
-                    NUMBER => $vlan_id,
-                    NAME   => $name
-                };
-    }
+    _setVlans(
+        snmp   => $snmp,
+        ports  => $ports,
+        logger => $logger
+    );
 
     _setTrunkPorts(
         snmp   => $snmp,
@@ -814,14 +838,14 @@ sub _setNetworkingProperties {
         logger => $logger
     );
 
-    _setConnectedDevicesInfo(
+    _setConnectedDevices(
         snmp   => $snmp,
         ports  => $ports,
         logger => $logger,
         vendor => $device->{INFO}->{MANUFACTURER}
     );
 
-    _setAssociatedMacAddresses(
+    _setKnownMacAddresses(
         snmp         => $snmp,
         ports        => $ports,
         logger       => $logger,
@@ -936,7 +960,7 @@ sub _getElements {
     return @array[$first .. $last];
 }
 
-sub _setAssociatedMacAddresses {
+sub _setKnownMacAddresses {
     my (%params) = @_;
 
     my $snmp   = $params{snmp};
@@ -944,14 +968,14 @@ sub _setAssociatedMacAddresses {
     my $logger = $params{logger};
 
     # start with mac addresses seen on default VLAN
-    my $addresses = _getAssociatedMacAddresses(
+    my $addresses = _getKnownMacAddresses(
         snmp           => $snmp,
         address2port   => '.1.3.6.1.2.1.17.4.3.1.2', # dot1dTpFdbPort
         port2interface => '.1.3.6.1.2.1.17.1.4.1.2', # dot1dBasePortIfIndex
     );
 
     if ($addresses) {
-        _addAssociatedMacAddresses(
+        _addKnownMacAddresses(
             ports     => $ports,
             logger    => $logger,
             addresses => $addresses,
@@ -959,14 +983,14 @@ sub _setAssociatedMacAddresses {
     }
 
     # add additional mac addresses for other VLANs
-    $addresses = _getAssociatedMacAddresses(
+    $addresses = _getKnownMacAddresses(
         snmp           => $snmp,
         address2port   => '.1.3.6.1.2.1.17.7.1.2.2.1.2', # dot1qTpFdbPort
         port2interface => '.1.3.6.1.2.1.17.1.4.1.2',     # dot1dBasePortIfIndex
     );
 
     if ($addresses) {
-        _addAssociatedMacAddresses(
+        _addKnownMacAddresses(
             ports     => $ports,
             logger    => $logger,
             addresses => $addresses,
@@ -992,14 +1016,14 @@ sub _setAssociatedMacAddresses {
         foreach my $vlan (@vlans) {
             $logger->debug("switching SNMP context to vlan $vlan") if $logger;
             $snmp->switch_vlan_context($vlan);
-            my $mac_addresses = _getAssociatedMacAddresses(
+            my $mac_addresses = _getKnownMacAddresses(
                 snmp           => $snmp,
                 address2port   => '.1.3.6.1.2.1.17.4.3.1.2', # dot1dTpFdbPort
                 port2interface => '.1.3.6.1.2.1.17.1.4.1.2', # dot1dBasePortIfIndex
             );
             next unless $mac_addresses;
 
-            _addAssociatedMacAddresses(
+            _addKnownMacAddresses(
                 ports     => $ports,
                 logger    => $logger,
                 addresses => $mac_addresses,
@@ -1010,7 +1034,7 @@ sub _setAssociatedMacAddresses {
 
 }
 
-sub _addAssociatedMacAddresses {
+sub _addKnownMacAddresses {
     my (%params) = @_;
 
     my $ports         = $params{ports};
@@ -1054,7 +1078,7 @@ sub _addAssociatedMacAddresses {
     }
 }
 
-sub _getAssociatedMacAddresses {
+sub _getKnownMacAddresses {
     my (%params) = @_;
 
     my $snmp   = $params{snmp};
@@ -1086,76 +1110,111 @@ sub _getAssociatedMacAddresses {
     return $results;
 }
 
-sub _setConnectedDevicesInfo {
+sub _setConnectedDevices {
     my (%params) = @_;
-
-    my $info =
-        _getConnectedDevicesInfoCDP(%params) ||
-        _getConnectedDevicesInfoLLDP(%params);
-    return unless $info;
 
     my $logger = $params{logger};
     my $ports  = $params{ports};
 
-    foreach my $port_id (keys %$info) {
-        # safety check
-        if (! exists $ports->{$port_id}) {
-            $logger->error(
-                "invalid inteface ID $port_id while setting connected devices" .
-                " aborting"
-            ) if $logger;
-            last;
-        }
+    my $lldp_info = _getLLDPInfo(%params);
+    if ($lldp_info) {
+        foreach my $interface_id (keys %$lldp_info) {
+            # safety check
+            if (! exists $ports->{$interface_id}) {
+                $logger->error(
+                    "unknown interface $interface_id in LLDP info, ignoring"
+                ) if $logger;
+                next;
+            }
 
-        $ports->{$port_id}->{CONNECTIONS} = {
-            CDP        => 1,
-            CONNECTION => $info->{$port_id}
-        };
+            my $port            = $ports->{$interface_id};
+            my $lldp_connection = $lldp_info->{$interface_id};
+
+            $port->{CONNECTIONS} = {
+                CDP        => 1,
+                CONNECTION => $lldp_connection
+            };
+        }
+    }
+
+    my $cdp_info = _getCDPInfo(%params);
+    if ($cdp_info) {
+        foreach my $interface_id (keys %$cdp_info) {
+            # safety check
+            if (! exists $ports->{$interface_id}) {
+                $logger->error(
+                    "unknown interface $interface_id in CDP info, ignoring"
+                ) if $logger;
+                next;
+            }
+
+            my $port            = $ports->{$interface_id};
+            my $lldp_connection = $port->{CONNECTIONS}->{CONNECTION};
+            my $cdp_connection  = $cdp_info->{$interface_id};
+
+            if ($lldp_connection) {
+                if ($cdp_connection->{SYSDESCR} eq $lldp_connection->{SYSDESCR}) {
+                    # same device, everything OK
+                    foreach my $key (qw/IP MODEL/) {
+                        $lldp_connection->{$key} = $cdp_connection->{$key};
+                    }
+                } else {
+                    # undecidable situation
+                    $logger->error(
+                        "multiple neighbors found by LLDP and CDP for " .
+                        "interface $interface_id, ignoring"
+                    );
+                    delete $port->{CONNECTIONS};
+                }
+            } else {
+                $port->{CONNECTIONS} = {
+                    CDP        => 1,
+                    CONNECTION => $cdp_connection
+                };
+            }
+        }
+    }
+
+    my $edp_info = _getEDPInfo(%params);
+    if ($edp_info) {
+        foreach my $interface_id (keys %$edp_info) {
+            # safety check
+            if (! exists $ports->{$interface_id}) {
+                $logger->error(
+                    "unknown interface $interface_id in EDP info, ignoring"
+                ) if $logger;
+                next;
+            }
+
+            my $port            = $ports->{$interface_id};
+            my $lldp_connection = $port->{CONNECTIONS}->{CONNECTION};
+            my $edp_connection  = $edp_info->{$interface_id};
+
+            if ($lldp_connection) {
+                if ($edp_connection->{SYSDESCR} eq $lldp_connection->{SYSDESCR}) {
+                    # same device, everything OK
+                    foreach my $key (qw/IP/) {
+                        $lldp_connection->{$key} = $edp_connection->{$key};
+                    }
+                } else {
+                    # undecidable situation
+                    $logger->error(
+                        "multiple neighbors found by LLDP and EDP for " .
+                        "interface $interface_id, ignoring"
+                    );
+                    delete $port->{CONNECTIONS};
+                }
+            } else {
+                $port->{CONNECTIONS} = {
+                    CDP        => 1,
+                    CONNECTION => $edp_connection
+                };
+            }
+        }
     }
 }
 
-sub _getConnectedDevicesInfoCDP {
-    my (%params) = @_;
-
-    my $snmp   = $params{snmp};
-
-    my $results;
-    my $cdpCacheAddress    = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.4');
-    my $cdpCacheVersion    = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.5');
-    my $cdpCacheDeviceId   = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.6');
-    my $cdpCacheDevicePort = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.7');
-    my $cdpCachePlatform   = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.8');
-
-    # each cdp variable matches the following scheme:
-    # $prefix.x.y = $value
-    # whereas x is the port number
-
-    while (my ($suffix, $ip) = each %{$cdpCacheAddress}) {
-        my $port_id = _getElement($suffix, -2);
-        $ip = hex2canonical($ip);
-        next if $ip eq '0.0.0.0';
-
-        my $connection = {
-            IP       => $ip,
-            IFDESCR  => $cdpCacheDevicePort->{$suffix},
-            SYSDESCR => $cdpCacheVersion->{$suffix},
-            SYSNAME  => $cdpCacheDeviceId->{$suffix},
-            MODEL    => $cdpCachePlatform->{$suffix}
-        };
-
-        if ($connection->{SYSNAME} =~ /^SIP([A-F0-9a-f]*)$/) {
-            $connection->{MAC} = lc(alt2canonical("0x".$1));
-        }
-
-        next if !$connection->{SYSDESCR} || !$connection->{MODEL};
-
-        $results->{$port_id} = $connection;
-    }
-
-    return $results;
-}
-
-sub _getConnectedDevicesInfoLLDP {
+sub _getLLDPInfo {
     my (%params) = @_;
 
     my $snmp   = $params{snmp};
@@ -1167,8 +1226,10 @@ sub _getConnectedDevicesInfoLLDP {
     my $lldpRemSysName   = $snmp->walk('.1.0.8802.1.1.2.1.4.1.1.9');
     my $lldpRemSysDesc   = $snmp->walk('.1.0.8802.1.1.2.1.4.1.1.10');
 
-    # dot1dBasePortIfIndex
-    my $port2interface = $snmp->walk('.1.3.6.1.2.1.17.1.4.1.2');
+    # port to interface mapping
+    my $port2interface =
+        $snmp->walk('.1.3.6.1.4.1.9.5.1.4.1.1.11.1') || # Cisco portIfIndex
+        $snmp->walk('.1.3.6.1.2.1.17.1.4.1.2');         # dot1dBasePortIfIndex
 
     # each lldp variable matches the following scheme:
     # $prefix.x.y.z = $value
@@ -1180,12 +1241,199 @@ sub _getConnectedDevicesInfoLLDP {
             ! exists $port2interface->{$id} ? $id                   :
             $params{vendor} eq 'Juniper'    ? $id                   :
                                               $port2interface->{$id};
-        $results->{$interface_id} = {
+
+
+        my $connection = {
             SYSMAC   => lc(alt2canonical($mac)),
             IFDESCR  => $lldpRemPortDesc->{$suffix},
             SYSDESCR => $lldpRemSysDesc->{$suffix},
-            SYSNAME  => $lldpRemSysName->{$suffix},
+            SYSNAME  => hex2char($lldpRemSysName->{$suffix}),
             IFNUMBER => $lldpRemPortId->{$suffix}
+        };
+
+        next if !$connection->{SYSDESCR};
+
+        $results->{$interface_id} = $connection;
+    }
+
+    return $results;
+}
+
+sub _getCDPInfo {
+    my (%params) = @_;
+
+    my $snmp   = $params{snmp};
+    my $logger = $params{logger};
+
+    my ($results, $blacklist);
+    my $cdpCacheAddress    = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.4');
+    my $cdpCacheVersion    = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.5');
+    my $cdpCacheDeviceId   = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.6');
+    my $cdpCacheDevicePort = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.7');
+    my $cdpCachePlatform   = $snmp->walk('.1.3.6.1.4.1.9.9.23.1.2.1.1.8');
+
+    # each cdp variable matches the following scheme:
+    # $prefix.x.y = $value
+    # whereas x is the port number
+
+    while (my ($suffix, $ip) = each %{$cdpCacheAddress}) {
+        my $interface_id = _getElement($suffix, -2);
+        $ip = hex2canonical($ip);
+        next if $ip eq '0.0.0.0';
+
+        my $connection = {
+            IP       => $ip,
+            SYSDESCR => $cdpCacheVersion->{$suffix},
+            MODEL    => $cdpCachePlatform->{$suffix}
+        };
+
+        # cdpCacheDevicePort is either a port number or a port description
+        my $devicePort = $cdpCacheDevicePort->{$suffix};
+        if ($devicePort =~ /^\d+$/) {
+            $connection->{IFNUMBER} = $devicePort;
+        } else {
+            $connection->{IFDESCR} = $devicePort;
+        }
+
+        # cdpCacheDeviceId is either remote host name, either remote mac address
+        my $deviceId = $cdpCacheDeviceId->{$suffix};
+        if ($deviceId =~ /^0x/) {
+            if (length($deviceId) == 14) {
+                # let's assume it is a mac address if the length is 6 bytes
+                $connection->{SYSMAC} = lc(alt2canonical($deviceId));
+            } else {
+                # otherwise it's an hex-encode hostname
+                $connection->{SYSNAME} = hex2char($deviceId);
+            }
+        } else {
+            $connection->{SYSNAME} = $deviceId;
+        }
+
+        if ($connection->{SYSNAME} &&
+            $connection->{SYSNAME} =~ /^SIP([A-F0-9a-f]*)$/) {
+            $connection->{MAC} = lc(alt2canonical("0x".$1));
+        }
+
+        next if !$connection->{SYSDESCR} || !$connection->{MODEL};
+
+        # warning: multiple neighbors announcement for the same interface
+        # usually means a non-CDP aware intermediate equipement
+        if ($results->{$interface_id}) {
+            $logger->error(
+                "multiple neighbors found by CDP for interface $interface_id," .
+                " ignoring"
+            );
+            $blacklist->{$interface_id} = 1;
+        } else {
+            $results->{$interface_id} = $connection;
+        }
+    }
+
+    # remove blacklisted results
+    delete $results->{$_} foreach keys %$blacklist;
+
+    return $results;
+}
+
+sub _getEDPInfo {
+    my (%params) = @_;
+
+    my $snmp   = $params{snmp};
+    my $logger = $params{logger};
+
+    my ($results, $blacklist);
+    my $edpNeighborVlanIpAddress = $snmp->walk('.1.3.6.1.4.1.1916.1.13.3.1.3');
+    my $edpNeighborName          = $snmp->walk('.1.3.6.1.4.1.1916.1.13.2.1.3');
+    my $edpNeighborPort          = $snmp->walk('.1.3.6.1.4.1.1916.1.13.2.1.6');
+
+    # each entry from extremeEdpTable matches the following scheme:
+    # $prefix.x.0.0.y1.y2.y3.y4.y5.y6 = $value
+    # - x: the interface id
+    # - y1.y2.y3.y4.y5.y6: the remote mac address
+
+    # each entry from extremeEdpNeighborTable matches the following scheme:
+    # $prefix.x.0.0.y1.y2.y3.y4.y5.y6.z1.z2...zz = $value
+    # - x: the interface id,
+    # - y1.y2.y3.y4.y5.y6: the remote mac address
+    # - z1.z2...zz: the vlan name in ASCII
+
+    while (my ($suffix, $ip) = each %{$edpNeighborVlanIpAddress}) {
+        next if $ip eq '0.0.0.0';
+
+        my $interface_id = _getElement($suffix, 0);
+        my @mac_elements = _getElements($suffix, 3, 8);
+        my $short_suffix = join('.', $interface_id, 0, 0, @mac_elements);
+
+        my $connection = {
+            IP       => $ip,
+            IFDESCR  => $edpNeighborPort->{$short_suffix},
+            SYSNAME  => $edpNeighborName->{$short_suffix},
+            SYSMAC   => sprintf "%02x:%02x:%02x:%02x:%02x:%02x", @mac_elements
+        };
+
+        # warning: multiple neighbors announcement for the same interface
+        # usually means a non-EDP aware intermediate equipement
+        if ($results->{$interface_id}) {
+            $logger->error(
+                "multiple neighbors found by EDP for interface $interface_id," .
+                " ignoring"
+            );
+            $blacklist->{$interface_id} = 1;
+        } else {
+            $results->{$interface_id} = $connection;
+        }
+    }
+
+    # remove blacklisted results
+    delete $results->{$_} foreach keys %$blacklist;
+
+    return $results;
+}
+
+
+sub _setVlans {
+    my (%params) = @_;
+
+    my $vlans = _getVlans(
+        snmp  => $params{snmp},
+    );
+    return unless $vlans;
+
+    my $ports  = $params{ports};
+    my $logger = $params{logger};
+
+    foreach my $port_id (keys %$vlans) {
+        # safety check
+        if (! exists $ports->{$port_id}) {
+            $logger->error(
+                "invalid interface ID $port_id while setting vlans, aborting"
+            ) if $logger;
+            last;
+        }
+        $ports->{$port_id}->{VLANS}->{VLAN} = $vlans->{$port_id};
+    }
+}
+
+sub _getVlans {
+    my (%params) = @_;
+
+    my $snmp = $params{snmp};
+
+    my $results;
+    my $vtpVlanName  = $snmp->walk('.1.3.6.1.4.1.9.9.46.1.3.1.1.4.1');
+    my $vmPortStatus = $snmp->walk('.1.3.6.1.4.1.9.9.68.1.2.2.1.2');
+
+    # each result matches either of the following schemes:
+    # $prefix.$i.$j = $value, with $j as port id, and $value as vlan id
+    # $prefix.$i    = $value, with $i as port id, and $value as vlan id
+    foreach my $suffix (sort keys %{$vmPortStatus}) {
+        my $port_id = _getElement($suffix, -1);
+        my $vlan_id = $vmPortStatus->{$suffix};
+        my $name    = $vtpVlanName->{$vlan_id};
+
+        push @{$results->{$port_id}}, {
+            NUMBER => $vlan_id,
+            NAME   => $name
         };
     }
 

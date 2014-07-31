@@ -18,116 +18,84 @@ sub doInventory {
     my (%params) = @_;
 
     my $inventory = $params{inventory};
-    my $logger    = $params{logger};
 
-    foreach my $object (getWMIObjects(
-            class      => 'Win32_OperatingSystem',
-            properties => [ qw/
-                OSLanguage Caption Version SerialNumber Organization
-                RegisteredUser CSDVersion TotalSwapSpaceSize
-                OSArchitecture LastBootUpTime
-            / ]
-        )) {
+    my ($operatingSystem) = getWMIObjects(
+        class      => 'Win32_OperatingSystem',
+        properties => [ qw/
+            OSLanguage Caption Version SerialNumber Organization RegisteredUser
+            CSDVersion TotalSwapSpaceSize LastBootUpTime
+        / ]
+    );
 
-        my $key = parseProductKey(getRegistryValue(path => 'HKEY_LOCAL_MACHINE/Software/Microsoft/Windows NT/CurrentVersion/DigitalProductId'));
-        if (!$key) { # 582
-           $key = parseProductKey(getRegistryValue(path => 'HKEY_LOCAL_MACHINE/Software/Microsoft/Windows NT/CurrentVersion/DigitalProductId4'));
-        }
-        my $description = encodeFromRegistry(getRegistryValue(
-            path   => 'HKEY_LOCAL_MACHINE/SYSTEM/CurrentControlSet/Services/lanmanserver/Parameters/srvcomment',
-            logger => $logger
-        ));
-
-        $object->{TotalSwapSpaceSize} = int($object->{TotalSwapSpaceSize} / (1024 * 1024))
-            if $object->{TotalSwapSpaceSize};
-
-        $inventory->setHardware({
-            WINLANG       => $object->{OSLanguage},
-            OSNAME        => $object->{Caption},
-            OSVERSION     => $object->{Version},
-            WINPRODKEY    => $key,
-            WINPRODID     => $object->{SerialNumber},
-            WINCOMPANY    => $object->{Organization},
-            WINOWNER      => $object->{RegistredUser},
-            OSCOMMENTS    => $object->{CSDVersion},
-            SWAP          => $object->{TotalSwapSpaceSize},
-            DESCRIPTION   => $description,
-        });
-
-        my $osArchitecture =  $object->{OSArchitecture} || '32-bit';
-        $osArchitecture =~ s/ /-/; # "64 bit" => "64-bit"
-
-        my $boottime;
-        if ($object->{LastBootUpTime} =~
-                /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/) {
-            $boottime = getFormatedDate($1, $2, $3, $4, $5, 6);
-        }
-
-        $inventory->setOperatingSystem({
-            NAME           => "Windows",
-            INSTALL_DATE   => _getInstallDate(),
-    #        VERSION       => $OSVersion,
-            KERNEL_VERSION => $object->{Version},
-            FULL_NAME      => $object->{Caption},
-            SERVICE_PACK   => $object->{CSDVersion},
-            ARCH           => $osArchitecture,
-            BOOT_TIME      => $boottime,
-        });
-    }
-
-    # In the rare case WMI DB is broken,
-    # We first initialize the name by kernel32
-    # call
-    my $name = FusionInventory::Agent::Tools::Hostname::getHostname();
-    $name = $ENV{COMPUTERNAME} unless $name;
-    my $domain;
-
-    if ($name  =~ s/^([^\.]+)\.(.*)/$1/) {
-        $domain = $2;
-    }
-
-    $inventory->setHardware({
-        NAME       => $name,
-        WORKGROUP  => $domain
-    });
-
-    foreach my $object (getWMIObjects(
+    my ($computerSystem) = getWMIObjects(
         class      => 'Win32_ComputerSystem',
         properties => [ qw/
-            Name Domain Workgroup UserName PrimaryOwnerName TotalPhysicalMemory
+            Name Domain Workgroup PrimaryOwnerName TotalPhysicalMemory
         / ]
-    )) {
+    );
 
-        $object->{TotalPhysicalMemory} = int($object->{TotalPhysicalMemory} / (1024 * 1024))
-            if $object->{TotalPhysicalMemory};
-
-        $inventory->setHardware({
-            MEMORY     => $object->{TotalPhysicalMemory},
-            WORKGROUP  => $object->{Domain} || $object->{Workgroup},
-            WINOWNER   => $object->{PrimaryOwnerName}
-        });
-
-        if (!$name) {
-            $inventory->setHardware({
-                NAME       => $object->{Name},
-            });
-        }
-
-
-    }
-
-    foreach my $object (getWMIObjects(
+    my ($computerSystemProduct) = getWMIObjects(
         class      => 'Win32_ComputerSystemProduct',
         properties => [ qw/UUID/ ]
-    )) {
+    );
 
-        my $uuid = $object->{UUID};
-        $uuid = '' if $uuid =~ /^[0-]+$/;
-        $inventory->setHardware({
-            UUID => $uuid,
-        });
+    my $key =
+        parseProductKey(getRegistryValue(path => 'HKEY_LOCAL_MACHINE/Software/Microsoft/Windows NT/CurrentVersion/DigitalProductId')) ||
+        parseProductKey(getRegistryValue(path => 'HKEY_LOCAL_MACHINE/Software/Microsoft/Windows NT/CurrentVersion/DigitalProductId4'));
 
+    my $description =
+        encodeFromRegistry(getRegistryValue(path => 'HKEY_LOCAL_MACHINE/SYSTEM/CurrentControlSet/Services/lanmanserver/Parameters/srvcomment'));
+
+    my $arch = is64bit() ? '64-bit' : '32-bit';
+
+    my $swap = $operatingSystem->{TotalSwapSpaceSize} ?
+        int($operatingSystem->{TotalSwapSpaceSize} / (1024 * 1024)) : undef;
+
+    my $memory = $computerSystem->{TotalPhysicalMemory} ?
+        int($computerSystem->{TotalPhysicalMemory} / (1024 * 1024)) : undef;
+
+    my $uuid = $computerSystemProduct->{UUID} !~ /^[0-]+$/ ?
+        $computerSystemProduct->{UUID} : undef;
+
+    my $boottime;
+    if ($operatingSystem->{LastBootUpTime} =~
+            /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/) {
+        $boottime = getFormatedDate($1, $2, $3, $4, $5, $6);
     }
+
+    # get the name through native Win32::API, as WMI DB is sometimes broken
+    my $name = FusionInventory::Agent::Tools::Hostname::getHostname() ||
+               $ENV{COMPUTERNAME};
+    $name =~ s/^([^.]+)/$1/;
+
+    $inventory->setOperatingSystem({
+        NAME           => "Windows",
+        ARCH           => $arch,
+        INSTALL_DATE   => _getInstallDate(),
+        BOOT_TIME      => $boottime,
+        KERNEL_VERSION => $operatingSystem->{Version},
+        FULL_NAME      => $operatingSystem->{Caption},
+        SERVICE_PACK   => $operatingSystem->{CSDVersion},
+    });
+
+    $inventory->setHardware({
+        NAME        => $name,
+        DESCRIPTION => $description,
+        UUID        => $uuid,
+        WINPRODKEY  => $key,
+        WINLANG     => $operatingSystem->{OSLanguage},
+        OSNAME      => $operatingSystem->{Caption},
+        OSVERSION   => $operatingSystem->{Version},
+        WINPRODID   => $operatingSystem->{SerialNumber},
+        WINCOMPANY  => $operatingSystem->{Organization},
+        WINOWNER    => $operatingSystem->{RegisteredUser} ||
+                       $computerSystem->{PrimaryOwnerName},
+        OSCOMMENTS  => $operatingSystem->{CSDVersion},
+        SWAP        => $operatingSystem->{TotalSwapSpaceSize},
+        MEMORY      => $computerSystem->{TotalPhysicalMemory},
+        WORKGROUP   => $computerSystem->{Domain} ||
+                       $computerSystem->{Workgroup},
+    });
 }
 
 sub _getInstallDate {
@@ -141,7 +109,5 @@ sub _getInstallDate {
 
     return getFormatedLocalTime($dec);
 }
-
-
 
 1;
