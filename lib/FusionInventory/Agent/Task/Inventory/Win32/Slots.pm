@@ -3,10 +3,16 @@ package FusionInventory::Agent::Task::Inventory::Win32::Slots;
 use strict;
 use warnings;
 
-# Had never been tested. There is no slot on my virtal machine.
 use FusionInventory::Agent::Tools::Win32;
 
+my %status = (
+    3 => 'free',
+    4 => 'used'
+);
+
 sub isEnabled {
+    my (%params) = @_;
+    return 0 if $params{no_category}->{slot};
     return 1;
 }
 
@@ -17,7 +23,7 @@ sub doInventory {
 
     foreach my $object (getWMIObjects(
         class      => 'Win32_SystemSlot',
-        properties => [ qw/Name Description SlotDesignation Status/ ]
+        properties => [ qw/Name Description SlotDesignation CurrentUsage/ ]
     )) {
 
         $inventory->addEntry(
@@ -26,7 +32,7 @@ sub doInventory {
                 NAME        => $object->{Name},
                 DESCRIPTION => $object->{Description},
                 DESIGNATION => $object->{SlotDesignation},
-                STATUS      => $object->{Status},
+                STATUS      => $status{$object->{CurrentUsage}}
             }
         );
     }

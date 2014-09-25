@@ -6,9 +6,9 @@ use warnings;
 use FusionInventory::Agent::Tools;
 
 sub isEnabled {
-
-    return
-        canRead("/proc/bus/input/devices");
+    my (%params) = @_;
+    return 0 if $params{no_category}->{input};
+    return -r '/proc/bus/input/devices';
 }
 
 sub doInventory {

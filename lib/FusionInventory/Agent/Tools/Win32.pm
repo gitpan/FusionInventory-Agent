@@ -39,7 +39,6 @@ our @EXPORT = qw(
     getWMIObjects
     getLocalCodepage
     runCommand
-    parseProductKey
 );
 
 sub is64bit {
@@ -88,16 +87,18 @@ sub getWMIObjects {
     )) {
         my $object;
         foreach my $property (@{$params{properties}}) {
-            if (!ref($instance->{$property}) && $instance->{$property}) {
-                # cast the Win32::OLE object in string
-                $object->{$property} = sprintf("%s", $instance->{$property});
-
-                # because of the Win32::OLE->Option(CP => Win32::OLE::CP_UTF8);
-                # we know it's UTF8, let's flag the string according because
-                # Win32::OLE don't do it
-                utf8::upgrade($object->{$property});
-            } else {
+            if (defined $instance->{$property} && !ref($instance->{$property})) {
+                # string value
                 $object->{$property} = $instance->{$property};
+                # despite CP_UTF8 usage, Win32::OLE downgrades string to native
+                # encoding, if possible, ie all characters have code <= 0x00FF:
+                # http://code.activestate.com/lists/perl-win32-users/Win32::OLE::CP_UTF8/
+                utf8::upgrade($object->{$property});
+            } elsif (defined $instance->{$property}) {
+                # list value
+                $object->{$property} = $instance->{$property};
+            } else {
+                $object->{$property} = undef;
             }
         }
         push @objects, $object;
@@ -225,64 +226,6 @@ sub runCommand {
     return ($exitcode, $buff);
 }
 
-# inspired by http://poshcode.org/4363
-sub parseProductKey {
-    my ($key_string) = @_;
-
-    ## no critic (ProhibitBitwise)
-
-    return unless $key_string;
-
-    my @key_bytes = unpack 'C*', $key_string;
-
-    # check for Windows 8/Office 2013 style key (can contains the letter "N")
-    my $containsN  = ($key_bytes[66] >> 3) & 1;
-    $key_bytes[66] = ($key_bytes[66] & 0xF7);
-
-    # length of product key, in chars
-    my $chars_length = 25;
-
-    # length of product key, in bytes
-    my $bytes_length = 15;
-
-    # product key available characters
-    my @letters = qw(B C D F G H J K M P Q R T V W X Y 2 3 4 6 7 8 9);
-
-    # extract bytes 52 to 66
-    my @bytes = @key_bytes[52 .. 66];
-
-    # return immediatly for null keys
-    return if all { $_ == 00 } @bytes;
-
-    # decoded product key
-    my @chars;
-
-    for (my $i = $chars_length - 1; $i >= 0; $i--) {
-        my $index = 0;
-        for (my $j = $bytes_length - 1; $j >= 0; $j--) {
-            my $value = ($index << 8) | $bytes[$j];
-            $bytes[$j] = $value / scalar @letters;
-            $index = $value % (scalar @letters);
-        }
-        $chars[$i] = $letters[$index];
-    }
-
-    if ($containsN != 0) {
-        my $first_char = shift @chars;
-        my $first_char_index = 0;
-        for (my $index = 0; $index < scalar @letters; $index++) {
-            next if $first_char ne $letters[$index];
-            $first_char_index = $index;
-            last;
-        }
-
-        splice @chars, $first_char_index, 0, 'N';
-    }
-
-    return sprintf
-        '%s%s%s%s%s-%s%s%s%s%s-%s%s%s%s%s-%s%s%s%s%s-%s%s%s%s%s', @chars;
-}
-
 sub getInterfaces {
 
     my @configurations;
@@ -330,20 +273,23 @@ sub getInterfaces {
         # http://comments.gmane.org/gmane.comp.monitoring.fusion-inventory.devel/34
         next unless $object->{PNPDeviceID};
 
+        my $pciid;
+        if ($object->{PNPDeviceID} =~ /PCI\\VEN_(\w{4})&DEV_(\w{4})&SUBSYS_(\w{4})(\w{4})/) {
+            $pciid = join(':', $1 , $2 , $3 , $4);
+        }
+
         my $configuration = $configurations[$object->{Index}];
 
         if ($configuration->{addresses}) {
             foreach my $address (@{$configuration->{addresses}}) {
 
                 my $interface = {
-                    SPEED       => $object->{Speed},
                     PNPDEVICEID => $object->{PNPDeviceID},
+                    PCIID       => $pciid,
                     MACADDR     => $configuration->{MACADDR},
                     DESCRIPTION => $configuration->{DESCRIPTION},
                     STATUS      => $configuration->{STATUS},
-                    IPDHCP      => $configuration->{IPDHCP},
                     MTU         => $configuration->{MTU},
-                    IPGATEWAY   => $configuration->{IPGATEWAY},
                     dns         => $configuration->{dns},
                 };
 
@@ -354,6 +300,8 @@ sub getInterfaces {
                         $interface->{IPADDRESS},
                         $interface->{IPMASK}
                     );
+                    $interface->{IPDHCP}    = $configuration->{IPDHCP};
+                    $interface->{IPGATEWAY} = $configuration->{IPGATEWAY};
                 } else {
                     $interface->{IPADDRESS6} = $address->[0];
                     $interface->{IPMASK6}    = getNetworkMaskIPv6($address->[1]);
@@ -363,8 +311,9 @@ sub getInterfaces {
                     );
                 }
 
+                $interface->{SPEED}      = $object->{Speed} / 1_000_000
+                    if $object->{Speed};
                 $interface->{VIRTUALDEV} = _isVirtual($object, $configuration);
-                $interface->{TYPE}       = _getType($object);
 
                 push @interfaces, $interface;
             }
@@ -372,19 +321,18 @@ sub getInterfaces {
             next unless $configuration->{MACADDR};
 
             my $interface = {
-                SPEED       => $object->{Speed},
                 PNPDEVICEID => $object->{PNPDeviceID},
+                PCIID       => $pciid,
                 MACADDR     => $configuration->{MACADDR},
                 DESCRIPTION => $configuration->{DESCRIPTION},
                 STATUS      => $configuration->{STATUS},
-                IPDHCP      => $configuration->{IPDHCP},
                 MTU         => $configuration->{MTU},
-                IPGATEWAY   => $configuration->{IPGATEWAY},
                 dns         => $configuration->{dns},
             };
 
+            $interface->{SPEED}      = $object->{Speed} / 1_000_000
+                if $object->{Speed};
             $interface->{VIRTUALDEV} = _isVirtual($object, $configuration);
-            $interface->{TYPE}       = _getType($object);
 
             push @interfaces, $interface;
         }
@@ -415,20 +363,6 @@ sub _isVirtual {
     return $object->{PNPDeviceID} =~ /^ROOT/ ? 1 : 0;
 }
 
-sub _getType {
-    my ($object) = @_;
-
-    return unless defined $object->{AdapterTypeId};
-
-    # available adapter types:
-    # http://msdn.microsoft.com/en-us/library/windows/desktop/aa394216%28v=vs.85%29.aspx
-    # don't bother discriminating between wired and wireless ethernet adapters
-    # for sake of simplicity
-    return
-        $object->{AdapterTypeId} == 0 ? 'ethernet' :
-        $object->{AdapterTypeId} == 9 ? 'wifi'     :
-                                        undef      ;
-}
 
 1;
 __END__
@@ -518,10 +452,6 @@ Return an array
 =item fd a file descriptor on the output
 
 =back
-
-=head2 parseProductKey($string)
-
-Return a Parsed binary product key (XP, office, etc)
 
 =head2 getInterfaces()
 

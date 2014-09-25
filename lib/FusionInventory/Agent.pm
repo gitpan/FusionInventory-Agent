@@ -21,7 +21,7 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Hostname;
 use FusionInventory::Agent::XML::Query::Prolog;
 
-our $VERSION = '2.3.10.1';
+our $VERSION = '2.3.11';
 our $VERSION_STRING = _versionString($VERSION);
 our $AGENT_STRING = "FusionInventory-Agent_v$VERSION";
 
@@ -60,10 +60,14 @@ sub init {
     );
     $self->{config} = $config;
 
+    my $verbosity = $config->{debug} && $config->{debug} == 1 ? LOG_DEBUG  :
+                    $config->{debug} && $config->{debug} == 2 ? LOG_DEBUG2 :
+                                                                LOG_INFO   ;
+
     my $logger = FusionInventory::Agent::Logger->new(
-        config   => $config,
-        backends => $config->{logger},
-        debug    => $config->{debug}
+        config    => $config,
+        backends  => $config->{logger},
+        verbosity => $verbosity
     );
     $self->{logger} = $logger;
 
@@ -201,7 +205,7 @@ sub run {
                 eval {
                     $self->_runTarget($target);
                 };
-                $self->{logger}->fault($EVAL_ERROR) if $EVAL_ERROR;
+                $self->{logger}->error($EVAL_ERROR) if $EVAL_ERROR;
                 $target->resetNextRunDate();
             }
 
@@ -224,7 +228,7 @@ sub run {
             eval {
                 $self->_runTarget($target);
             };
-            $self->{logger}->fault($EVAL_ERROR) if $EVAL_ERROR;
+            $self->{logger}->error($EVAL_ERROR) if $EVAL_ERROR;
         }
     }
 }
@@ -529,3 +533,8 @@ pairs:
     'Foo' => x,
     'Bar' => y,
 );
+
+=head1 LICENSE
+
+This software is licensed under the terms of GPLv2+, see LICENSE file for
+details.

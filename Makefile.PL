@@ -9,6 +9,7 @@ license 'gpl';
 repository 'https://github.com/fusinv/fusioninventory-agent';
 version_from 'lib/FusionInventory/Agent.pm';
 perl_version '5.008';
+authors 'FusionInventory Team';
 
 # mandatory dependencies
 requires 'File::Which'        => undef;
@@ -35,6 +36,7 @@ if ($OSNAME ne 'MSWin32') {
     recommends 'Proc::PID::File'  => undef;
 } else {
     recommends 'Win32::Daemon'    => undef;
+    recommends 'Win32::Unicode::File' => undef;
 }
 
 # test dependencies
@@ -87,6 +89,12 @@ install_script 'bin/fusioninventory-wakeonlan';
 install_script 'bin/fusioninventory-netdiscovery';
 install_script 'bin/fusioninventory-netinventory';
 install_script 'bin/fusioninventory-esx';
+
+resources
+    homepage    => "http://www.fusioninventory.org",
+    bugtracker  => "http://forge.fusioninventory.org/projects/fusioninventory-agent/issues",
+    repository  => "http://github.com/fusinv/fusioninventory-agent/",
+    IRC         => "irc://irc.freenode.net/#fusioninventory";
 
 makemaker_args(
     test => {
@@ -211,7 +219,6 @@ data_install :
 	install -m 644 share/pci.ids $(DESTDIR)$(DATADIR)/
 	install -m 644 share/usb.ids $(DESTDIR)$(DATADIR)/
 	install -m 644 share/sysobject.ids $(DESTDIR)$(DATADIR)/
-	install -m 644 share/consumables.ids $(DESTDIR)$(DATADIR)/
 	install -d -m 755 $(DESTDIR)$(DATADIR)/html
 	install -m 644 share/html/* $(DESTDIR)$(DATADIR)/html
 EOF

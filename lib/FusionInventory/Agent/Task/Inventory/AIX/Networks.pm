@@ -8,6 +8,8 @@ use FusionInventory::Agent::Tools::Unix;
 use FusionInventory::Agent::Tools::Network;
 
 sub isEnabled {
+    my (%params) = @_;
+    return 0 if $params{no_category}->{network};
     return canRun('lscfg');
 }
 
@@ -17,20 +19,15 @@ sub doInventory {
     my $inventory = $params{inventory};
     my $logger    = $params{logger};
 
-    # set list of network interfaces
-    my $routes = getRoutingTable(command => 'netstat -nr', logger => $logger);
     my @interfaces = _getInterfaces(logger => $logger);
-
     foreach my $interface (@interfaces) {
-        $interface->{IPGATEWAY} = $params{routes}->{$interface->{IPSUBNET}}
-            if $interface->{IPSUBNET};
-
         $inventory->addEntry(
             section => 'NETWORKS',
             entry   => $interface
         );
     }
 
+    my $routes = getRoutingTable(command => 'netstat -nr', logger => $logger);
     $inventory->setHardware({
         DEFAULTGATEWAY => $routes->{'0.0.0.0'}
     });
@@ -78,13 +75,14 @@ sub _getInterfaces {
     }
 
     foreach my $interface (@interfaces) {
-        $interface->{STATUS} = "Down" unless $interface->{IPADDRESS};
-        $interface->{IPDHCP} = "No";
-
         $interface->{IPSUBNET} = getSubnetAddress(
             $interface->{IPADDRESS},
             $interface->{IPMASK},
         );
+
+        $interface->{STATUS} = "Down" unless $interface->{IPADDRESS};
+        $interface->{IPDHCP} = "No";
+
     }
 
     return @interfaces;

@@ -4,144 +4,104 @@ use strict;
 use warnings;
 
 use FusionInventory::Agent::Tools;
+use FusionInventory::Agent::Tools::Generic;
 use FusionInventory::Agent::Tools::Win32;
 
 sub isEnabled {
-    return canRun('hdparm');
+    my (%params) = @_;
+    return 0 if $params{no_category}->{storage};
+    return 1;
 }
 
 sub doInventory {
     my (%params) = @_;
 
     my $inventory = $params{inventory};
+    my $logger    = $params{logger};
 
-    foreach my $object (getWMIObjects(
-        class      => 'Win32_DiskDrive',
-        properties => [ qw/
-            Name Manufacturer Model MediaType InterfaceType FirmwareRevision
-            SerialNumber Size SCSIPort SCSILogicalUnit SCSITargetId
-        / ]
-    )) {
+    my $hdparm = canRun('hdparm');
 
-        my $info = {};
-
-        if ($object->{Name} =~ /(\d+)$/) {
-            $info = _getInfo("hd", $1);
+    foreach my $storage (_getDrives(class => 'Win32_DiskDrive')) {
+        if ($hdparm && $storage->{NAME} =~ /(\d+)$/) {
+            my $info = getHdparmsInfo(
+                device => "/dev/hd" . chr(ord('a') + $1),
+                logger => $logger
+            );
+            $storage->{MODEL}    = $info->{model}    if $info->{model};
+            $storage->{FIRMWARE} = $info->{firmware} if $info->{firmware};
+            $storage->{SERIAL}   = $info->{serial}   if $info->{serial};
+            $storage->{DISKSIZE} = $info->{size}     if $info->{size};
         }
-
-        $object->{Size} = int($object->{Size} / (1024 * 1024))
-            if $object->{Size};
 
         $inventory->addEntry(
             section => 'STORAGES',
-            entry => {
-                MANUFACTURER => $object->{Manufacturer},
-                MODEL        => $info->{model} || $object->{Model},
-                DESCRIPTION  => $object->{Description},
-                NAME         => $object->{Name},
-                TYPE         => $object->{MediaType},
-                INTERFACE    => $object->{InterfaceType},
-                FIRMWARE     => $info->{firmware} || $object->{FirmwareRevision},
-                SERIAL       => $info->{serial} || $object->{SerialNumber},
-                DISKSIZE     => $info->{size} || $object->{Size},
-                SCSI_COID    => $object->{SCSIPort},
-                SCSI_LUN     => $object->{SCSILogicalUnit},
-                SCSI_UNID    => $object->{SCSITargetId},
-            }
+            entry   => $storage
         );
     }
 
-    foreach my $object (getWMIObjects(
-        class      => 'Win32_CDROMDrive',
-        properties => [ qw/
-            Manufacturer Caption Description Name MediaType InterfaceType
-            FirmwareRevision SerialNumber Size SCSIPort
-            SCSILogicalUnit SCSITargetId
-        / ]
-    )) {
-        my $info = {};
-
-        if ($object->{Name} =~ /(\d+)$/) {
-            $info = _getInfo("cdrom", $1);
+    foreach my $storage (_getDrives(class => 'Win32_CDROMDrive')) {
+        if ($hdparm && $storage->{NAME} =~ /(\d+)$/) {
+            my $info = getHdparmsInfo(
+                device => "/dev/scd" . chr(ord('a') + $1),
+                logger => $logger
+            );
+            $storage->{MODEL}    = $info->{model}    if $info->{model};
+            $storage->{FIRMWARE} = $info->{firmware} if $info->{firmware};
+            $storage->{SERIAL}   = $info->{serial}   if $info->{serial};
+            $storage->{DISKSIZE} = $info->{size}     if $info->{size};
         }
-
-        $object->{Size} = int($object->{Size} / (1024 * 1024))
-            if $object->{Size};
 
         $inventory->addEntry(
             section => 'STORAGES',
-            entry => {
-                MANUFACTURER => $object->{Manufacturer},
-                MODEL        => $info->{model} || $object->{Caption},
-                DESCRIPTION  => $object->{Description},
-                NAME         => $object->{Name},
-                TYPE         => $object->{MediaType},
-                INTERFACE    => $object->{InterfaceType},
-                FIRMWARE     => $info->{firmware} || $object->{FirmwareRevision},
-                SERIAL       => $info->{serial} || $object->{SerialNumber},
-                DISKSIZE     => $info->{size} || $object->{Size},
-                SCSI_COID    => $object->{SCSIPort},
-                SCSI_LUN     => $object->{SCSILogicalUnit},
-                SCSI_UNID    => $object->{SCSITargetId},
-            }
+            entry   => $storage
         );
     }
 
-    foreach my $object (getWMIObjects(
-        class      => 'Win32_TapeDrive',
-        properties => [ qw/
-            Manufacturer Caption Description Name MediaType InterfaceType
-            FirmwareRevision SerialNumber Size SCSIPort
-            SCSILogicalUnit SCSITargetId
-        / ]
-    )) {
-
-        $object->{Size} = int($object->{Size} / (1024 * 1024))
-            if $object->{Size};
-
+    foreach my $storage (_getDrives(class => 'Win32_TapeDrive')) {
         $inventory->addEntry(
             section => 'STORAGES',
-            entry => {
-                MANUFACTURER => $object->{Manufacturer},
-                MODEL        => $object->{Caption},
-                DESCRIPTION  => $object->{Description},
-                NAME         => $object->{Name},
-                TYPE         => $object->{MediaType},
-                INTERFACE    => $object->{InterfaceType},
-                FIRMWARE     => $object->{FirmwareRevision},
-                SERIAL       => $object->{SerialNumber},
-                DISKSIZE     => $object->{Size},
-                SCSI_COID    => $object->{SCSIPort},
-                SCSI_LUN     => $object->{SCSILogicalUnit},
-                SCSI_UNID    => $object->{SCSITargetId},
-            }
+            entry   => $storage
         );
     }
 }
 
-sub _getInfo {
-    my ($type, $nbr) = @_;
+sub _getDrives {
+    my (%params) = @_;
 
+    my @drives;
 
-    my $device = "/dev/";
-    $device .= $type eq 'hd'?'hd':'scd';
-    $device .= chr(ord('a')+$nbr);
+    foreach my $object (getWMIObjects(
+        class      => $params{class},
+        properties => [ qw/
+            Manufacturer Model Caption Description Name MediaType InterfaceType
+            FirmwareRevision SerialNumber Size
+            SCSIPort SCSILogicalUnit SCSITargetId
+        / ]
+    )) {
 
-    my $handle = getFileHandle(
-        command => "hdparm -I $device",
-    );
-    return unless $handle;
+        my $drive = {
+            MANUFACTURER => $object->{Manufacturer},
+            MODEL        => $object->{Model} || $object->{Caption},
+            DESCRIPTION  => $object->{Description},
+            NAME         => $object->{Name},
+            TYPE         => $object->{MediaType},
+            INTERFACE    => $object->{InterfaceType},
+            FIRMWARE     => $object->{FirmwareRevision},
+            SCSI_COID    => $object->{SCSIPort},
+            SCSI_LUN     => $object->{SCSILogicalUnit},
+            SCSI_UNID    => $object->{SCSITargetId},
+        };
 
-    my $info;
-    while (my $line = <$handle>) {
-        $info->{model} = $1 if $line =~ /Model Number:\s+(.*?)\s*$/;
-        $info->{firmware} = $1 if $line =~ /Firmware Revision:\s+(\S*)/;
-        $info->{serial} = $1 if $line =~ /Serial Number:\s+(\S*)/;
-        $info->{size} = $1 if $line =~ /1000:\s+(\d*)\sMBytes\s\(/;
+        $drive->{DISKSIZE} = int($object->{Size} / (1024 * 1024))
+            if $object->{Size};
+
+        $drive->{SERIAL} = $object->{SerialNumber}
+            if $object->{SerialNumber} && $object->{SerialNumber} !~ /^ +$/;
+
+        push @drives, $drive;
     }
-    close $handle;
 
-    return $info;
+    return @drives;
 }
 
 1;

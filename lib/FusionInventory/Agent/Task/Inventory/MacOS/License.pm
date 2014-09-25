@@ -4,9 +4,11 @@ use strict;
 use warnings;
 
 use FusionInventory::Agent::Tools;
-use FusionInventory::Agent::Tools::Generic::License;
+use FusionInventory::Agent::Tools::License;
 
 sub isEnabled {
+    my (%params) = @_;
+    return 0 if $params{no_category}->{licenseinfo};
     return 1;
 }
 
@@ -14,6 +16,7 @@ sub doInventory {
     my (%params) = @_;
 
     my $inventory = $params{inventory};
+    my $logger    = $params{logger};
 
     # Adobe
     my @found = getAdobeLicenses(
@@ -22,8 +25,14 @@ sub doInventory {
 
     # Transmit
     my @transmitFiles = glob('/System/Library/User Template/*.lproj/Library/Preferences/com.panic.Transmit.plist');
+
     if ($params{scan_homedirs}) {
-        push (@transmitFiles, glob('/Users/*/Library/Preferences/com.panic.Transmit.plist'));
+        push @transmitFiles, glob('/Users/*/Library/Preferences/com.panic.Transmit.plist');
+    } else {
+        $logger->info(
+            "'scan-homedirs' configuration parameters disabled, " .
+            "ignoring transmit installations in user directories"
+        );
     }
 
     foreach my $transmitFile (@transmitFiles) {

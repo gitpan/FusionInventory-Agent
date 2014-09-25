@@ -8,6 +8,8 @@ use FusionInventory::Agent::Tools::Network;
 use FusionInventory::Agent::Tools::Win32;
 
 sub isEnabled {
+    my (%params) = @_;
+    return 0 if $params{no_category}->{network};
     return 1;
 }
 
@@ -27,6 +29,7 @@ sub doInventory {
             if $interface->{IPADDRESS};
 
         delete $interface->{dns};
+        $interface->{TYPE} = _getType($interface->{PNPDEVICEID});
 
         $inventory->addEntry(
             section => 'NETWORKS',
@@ -40,6 +43,31 @@ sub doInventory {
         IPADDR         => join('/', uniq @ips),
     });
 
+}
+
+sub _getType {
+    my ($deviceId, $logger) = @_;
+
+    return unless defined $deviceId;
+
+    my $key = getRegistryKey(
+        path   => "HKEY_LOCAL_MACHINE/SYSTEM/CurrentControlSet/Control/Network/{4D36E972-E325-11CE-BFC1-08002BE10318}",
+        logger => $logger
+    );
+
+    foreach my $subkey (values %$key) {
+        next unless
+            $subkey->{'Connection/'}                     &&
+            $subkey->{'Connection/'}->{'/PnpInstanceID'} &&
+            $subkey->{'Connection/'}->{'/PnpInstanceID'} eq $deviceId;
+        my $subtype = $subkey->{'Connection/'}->{'/MediaSubType'};
+        return
+            !defined $subtype        ? 'ethernet' :
+            $subtype eq '0x00000002' ? 'wifi'     :
+                                       undef;
+    }
+
+    return undef;
 }
 
 1;

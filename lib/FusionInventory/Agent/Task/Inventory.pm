@@ -49,18 +49,6 @@ sub run {
         tag      => $self->{config}->{'tag'}
     );
 
-    if (not $self->{config}->{'scan-homedirs'}) {
-        $self->{logger}->debug(
-            "--scan-homedirs missing. Don't scan user directories"
-        );
-    }
-
-    if (not $self->{config}->{'scan-profiles'}) {
-        $self->{logger}->debug(
-            "--scan-profiles missing. Don't scan user profiles"
-        );
-    }
-
     if (not $ENV{PATH}) {
         # set a minimal PATH if none is set (#1129, #1747)
         $ENV{PATH} =
@@ -105,6 +93,8 @@ sub run {
             $self->{logger}->error("Can't write to $file: $ERRNO")
                 unless $handle;
         }
+
+        binmode $handle, ':encoding(UTF-8)';
 
         $self->_printInventory(
             inventory => $inventory,
@@ -341,7 +331,11 @@ sub _printInventory {
     SWITCH: {
         if ($params{format} eq 'xml') {
 
-            my $tpp = XML::TreePP->new(indent => 2);
+            my $tpp = XML::TreePP->new(
+                indent          => 2,
+                utf8_flag       => 1,
+                output_encoding => 'UTF-8'
+            );
             print {$params{handle}} $tpp->write({
                 REQUEST => {
                     CONTENT => $params{inventory}->{content},

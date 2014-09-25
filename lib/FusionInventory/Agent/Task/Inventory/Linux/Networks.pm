@@ -9,9 +9,9 @@ use FusionInventory::Agent::Tools::Unix;
 use FusionInventory::Agent::Tools::Linux;
 
 sub isEnabled {
-    return
-        canRun('ifconfig') ||
-        canRun('ip');
+    my (%params) = @_;
+    return 0 if $params{no_category}->{network};
+    return 1;
 }
 
 sub doInventory {
@@ -20,20 +20,15 @@ sub doInventory {
     my $inventory = $params{inventory};
     my $logger    = $params{logger};
 
-    # get the list of network interfaces
-    my $routes = getRoutingTable(command => 'netstat -nr', logger => $logger);
     my @interfaces = _getInterfaces(logger => $logger);
-
     foreach my $interface (@interfaces) {
-        $interface->{IPGATEWAY} = $params{routes}->{$interface->{IPSUBNET}}
-            if $interface->{IPSUBNET};
-
         $inventory->addEntry(
             section => 'NETWORKS',
             entry   => $interface
         );
     }
 
+    my $routes = getRoutingTable(command => 'netstat -nr', logger => $logger);
     $inventory->setHardware({
         DEFAULTGATEWAY => $routes->{'0.0.0.0'}
     });
@@ -44,91 +39,139 @@ sub _getInterfaces {
 
     my $logger = $params{logger};
 
-    my @interfaces = canRun('/sbin/ip') ?
-        getInterfacesFromIp(logger => $logger):
-        getInterfacesFromIfconfig(logger => $logger);
+    my @interfaces = _getInterfacesBase(logger => $logger);
 
     foreach my $interface (@interfaces) {
-        if (_isWifi($logger, $interface->{DESCRIPTION})) {
-            $interface->{TYPE} = "wifi";
-        }
-
         $interface->{IPSUBNET} = getSubnetAddress(
             $interface->{IPADDRESS},
             $interface->{IPMASK}
         );
 
-        my ($driver, $pcislot) = _getUevent(
+        $interface->{IPDHCP} = getIpDhcp(
+            $logger,
             $interface->{DESCRIPTION}
         );
-        $interface->{DRIVER} = $driver if $driver;
-        $interface->{PCISLOT} = $pcislot if $pcislot;
 
-        $interface->{VIRTUALDEV} = _isVirtual(
-            logger => $logger,
-            name   => $interface->{DESCRIPTION},
-            slot   => $interface->{PCISLOT}
-        );
+        # check if it is a physical interface
+        if (-d "/sys/class/net/$interface->{DESCRIPTION}/device") {
+            my $info = _getUevent($interface->{DESCRIPTION});
+            $interface->{DRIVER}  = $info->{DRIVER}
+                if $info->{DRIVER};
+            $interface->{PCISLOT} = $info->{PCI_SLOT_NAME}
+                if $info->{PCI_SLOT_NAME};
+            $interface->{PCIID} =
+                $info->{PCI_ID} . ':' . $info->{PCI_SUBSYS_ID}
+                if $info->{PCI_SUBSYS_ID} && $info->{PCI_ID};
 
-        $interface->{IPDHCP} = getIpDhcp($logger, $interface->{DESCRIPTION});
-        $interface->{SLAVES} = _getSlaves($interface->{DESCRIPTION});
+            $interface->{VIRTUALDEV} = 0;
+
+            # check if it is a wifi interface, otherwise assume ethernet
+            if (-d "/sys/class/net/$interface->{DESCRIPTION}/wireless") {
+                $interface->{TYPE} = 'wifi';
+                my $info = _parseIwconfig(name => $interface->{DESCRIPTION});
+                $interface->{WIFI_MODE}    = $info->{mode};
+                $interface->{WIFI_SSID}    = $info->{SSID};
+                $interface->{WIFI_BSSID}   = $info->{BSSID};
+                $interface->{WIFI_VERSION} = $info->{version};
+            } elsif (-f "/sys/class/net/$interface->{DESCRIPTION}/mode") {
+                $interface->{TYPE} = 'infiniband';
+            } else {
+                $interface->{TYPE} = 'ethernet';
+            }
+
+        } else {
+            $interface->{VIRTUALDEV} = 1;
+
+            if ($interface->{DESCRIPTION} eq 'lo') {
+                $interface->{TYPE} = 'loopback';
+            }
+
+            if ($interface->{DESCRIPTION} =~ m/^ppp/) {
+                $interface->{TYPE} = 'dialup';
+            }
+
+            # check if it is an alias or a tagged interface
+            if ($interface->{DESCRIPTION} =~ m/^([\w\d]+)[:.]\d+$/) {
+                $interface->{TYPE} = 'alias';
+                $interface->{BASE} = $1;
+             }
+            # check if is is a bridge
+            if (-d "/sys/class/net/$interface->{DESCRIPTION}/brif") {
+                $interface->{SLAVES} = _getSlaves($interface->{DESCRIPTION});
+                $interface->{TYPE}   = 'bridge';
+            }
+
+            # check if it is a bonding master
+            if (-d "/sys/class/net/$interface->{DESCRIPTION}/bonding") {
+                $interface->{SLAVES} = _getSlaves($interface->{DESCRIPTION});
+                $interface->{TYPE}   = 'aggregate';
+            }
+        }
+
+        # check if it is a bonding slave
+        if (-d "/sys/class/net/$interface->{DESCRIPTION}/bonding_slave") {
+            $interface->{MACADDR} = getFirstMatch(
+                command => "ethtool -P $interface->{DESCRIPTION}",
+                pattern => qr/^Permanent address: ($mac_address_pattern)$/,
+                logger  => $logger
+            );
+        }
+
+        if (-r "/sys/class/net/$interface->{DESCRIPTION}/speed") {
+            $interface->{SPEED} = getFirstLine(
+                file => "/sys/class/net/$interface->{DESCRIPTION}/speed"
+            );
+        }
     }
 
     return @interfaces;
 }
 
-# Handle slave devices (bonding)
+sub _getInterfacesBase {
+    my (%params) = @_;
+
+    my $logger = $params{logger};
+    $logger->debug("retrieving interfaces list:");
+
+    if (canRun('/sbin/ip')) {
+        my @interfaces = getInterfacesFromIp(logger => $logger);
+        $logger->debug_result(
+            action => 'running /sbin/ip command',
+            data   => scalar @interfaces
+        );
+        return @interfaces if @interfaces;
+    } else {
+        $logger->debug_result(
+            action => 'running /sbin/ip command',
+            status => 'command not available'
+        );
+    }
+
+    if (canRun('/sbin/ifconfig')) {
+        my @interfaces = getInterfacesFromIfconfig(logger => $logger);
+        $logger->debug_result(
+            action => 'running /sbin/ifconfig command',
+            data   => scalar @interfaces
+        );
+        return @interfaces if @interfaces;
+    } else {
+        $logger->debug_result(
+            action => 'running /sbin/ifconfig command',
+            status => 'command not available'
+        );
+    }
+
+    return;
+}
+
 sub _getSlaves {
     my ($name) = @_;
 
-    my @slaves = ();
-    while (my $slave = glob("/sys/class/net/$name/slave_*")) {
-        if ($slave =~ /\/slave_(\w+)/) {
-            push(@slaves, $1);
-        }
-    }
+    my @slaves =
+        map { $_ =~ /\/lower_(\w+)$/ }
+        glob("/sys/class/net/$name/lower_*");
 
     return join (",", @slaves);
-}
-
-# Handle virtual devices (bridge)
-sub _isVirtual {
-    my (%params) = @_;
-
-    return 0 if $params{slot};
-
-    if (-d "/sys/devices/virtual/net/") {
-        return -d "/sys/devices/virtual/net/$params{name}";
-    }
-
-    if (canRun('brctl')) {
-        # Let's guess
-        my %bridge;
-        my $handle = getFileHandle(
-            logger => $params{logger},
-            command => 'brctl show'
-        );
-        my $line = <$handle>;
-        while (my $line = <$handle>) {
-            next unless $line =~ /^(\w+)\s/;
-            $bridge{$1} = 1;
-        }
-        close $handle;
-
-        return defined $bridge{$params{name}};
-    }
-
-    return 0;
-}
-
-sub _isWifi {
-    my ($logger, $name) = @_;
-
-    my $count = getLinesCount(
-        logger  => $logger,
-        command => "/sbin/iwconfig $name"
-    );
-    return $count > 2;
 }
 
 sub _getUevent {
@@ -138,14 +181,40 @@ sub _getUevent {
     my $handle = getFileHandle(file => $file);
     return unless $handle;
 
-    my ($driver, $pcislot);
+    my $info;
     while (my $line = <$handle>) {
-        $driver = $1 if $line =~ /^DRIVER=(\S+)/;
-        $pcislot = $1 if $line =~ /^PCI_SLOT_NAME=(\S+)/;
+        next unless $line =~ /^(\w+)=(\S+)$/;
+        $info->{$1} = $2;
     }
     close $handle;
 
-    return ($driver, $pcislot);
+    return $info;
+}
+
+sub _parseIwconfig {
+    my (%params) = @_;
+
+    my $handle = getFileHandle(
+        %params,
+        command => $params{name} ? "iwconfig $params{name}" : undef
+    );
+    return unless $handle;
+
+    my $info;
+    while (my $line = <$handle>) {
+        $info->{version} = $1
+            if $line =~ /IEEE (\S+)/;
+        $info->{SSID} = $1
+            if $line =~ /ESSID:"([^"]+)"/;
+        $info->{mode} = $1
+            if $line =~ /Mode:(\S+)/;
+        $info->{BSSID} = $1
+            if $line =~ /Access Point: ($mac_address_pattern)/;
+    }
+
+    close $handle;
+
+    return $info;
 }
 
 1;

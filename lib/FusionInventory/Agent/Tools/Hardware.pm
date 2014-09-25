@@ -206,83 +206,20 @@ my %interface_variables = (
     },
 );
 
-my %consumables;
-
-my @consumable_type_rules = (
-    {
-        match => qr/cyan/i,
-        value => 'cyan'
-    },
-    {
-        match => qr/magenta/i,
-        value => 'magenta'
-    },
-    {
-        match => qr/(black|noir)/i,
-        value => 'black'
-    },
-    {
-        match => qr/(yellow|jaune)/i,
-        value => 'yellow'
-    },
-    {
-        match => qr/waste/i,
-        value => 'waste'
-    },
-    {
-        match => qr/maintenance/i,
-        value => 'maintenance'
-    },
-    {
-        match => qr/fuser/i,
-        value => 'fuser'
-    },
-    {
-        match => qr/transfer/i,
-        value => 'transfer'
-    },
-);
-
-my @consumable_subtype_rules = (
-    {
-        match => qr/toner/i,
-        value => 'toner'
-    },
-    {
-        match => qr/drum/i,
-        value => 'drum'
-    },
-    {
-        match => qr/ink/i,
-        value => 'cartridge'
-    },
-);
-
-my %consumable_variables_from_type = (
-    cyan => {
-        toner     => 'TONERCYAN',
-        drum      => 'DRUMCYAN',
-        cartridge => 'CARTRIDGECYAN',
-    },
-    magenta     => {
-        toner     => 'TONERMAGENTA',
-        drum      => 'DRUMMAGENTA',
-        cartridge => 'CARTRIDGEMAGENTA',
-    },
-    black     => {
-        toner     => 'TONERBLACK',
-        drum      => 'DRUMBLACK',
-        cartridge => 'CARTRIDGEBLACK',
-    },
-    yellow     => {
-        toner     => 'TONERYELLOW',
-        drum      => 'DRUMYELLOW',
-        cartridge => 'CARTRIDGEYELLOW',
-    },
-    waste       => 'WASTETONER',
-    maintenance => 'MAINTENANCEKIT',
-    fuser       => 'FUSERKIT',
-    transfer    => 'TRANSFERKIT',
+my %consumable_types = (
+     3 => 'TONER',
+     4 => 'WASTETONER',
+     5 => 'CARTRIDGE',
+     6 => 'CARTRIDGE',
+     8 => 'WASTETONER',
+     9 => 'DRUM',
+    10 => 'DEVELOPER',
+    12 => 'CARTRIDGE',
+    15 => 'FUSERKIT',
+    18 => 'MAINTENANCEKIT',
+    20 => 'TRANSFERKIT',
+    21 => 'TONER',
+    32 => 'STAPLES',
 );
 
 # printer-specific page counter variables
@@ -438,7 +375,7 @@ sub _getSysObjectIDInfo {
     # no match
     if (!$manufacturer_id) {
         $logger->debug(
-            "no match in sysobjectID database: " .
+            "no match for sysobjectID $params{id} in database: " .
             "no manufacturer ID"
         ) if $logger;
         return ();
@@ -447,15 +384,15 @@ sub _getSysObjectIDInfo {
     my $manufacturer = $sysobjectid{$manufacturer_id};
     if (!$manufacturer) {
         $logger->debug(
-            "no match in sysobjectID database: " .
-            "unknown manufacturer ID $manufacturer_id"
+            "no match for sysobjectID $params{id} in database: " .
+            "unknown manufacturer ID"
         ) if $logger;
         return ();
     }
 
     if (!$device_id) {
         $logger->debug(
-            "partial match in sysobjectID database: " .
+            "partial match for sysobjectID $params{id} in database: " .
             "no device ID"
         ) if $logger;
         return ($manufacturer->{name}, $manufacturer->{type});
@@ -464,13 +401,14 @@ sub _getSysObjectIDInfo {
     my $device = $manufacturer->{devices}->{$device_id};
     if (!$device) {
         $logger->debug(
-            "partial match in sysobjectID database: " .
-            "unknown device ID $device_id"
+            "partial match for sysobjectID $params{id} in database: " .
+            "unknown device ID"
         ) if $logger;
         return ($manufacturer->{name}, $manufacturer->{type});
     }
 
-    $logger->debug("full match in sysobjectID database") if $logger;
+    $logger->debug("full match for sysobjectID $params{id} in database")
+        if $logger;
     return ($manufacturer->{name}, $device->{type}, $device->{name});
 }
 
@@ -494,22 +432,6 @@ sub _loadSysObjectIDDatabase {
             $sysobjectid{$manufacturer_id}->{name} = $2;
             $sysobjectid{$manufacturer_id}->{type} = $3;
         }
-    }
-
-    close $handle;
-}
-
-sub _loadConsumablesDatabase {
-    my (%params) = @_;
-
-    return unless $params{datadir};
-
-    my $handle = getFileHandle(file => "$params{datadir}/consumables.ids");
-    return unless $handle;
-
-    while (my $line = <$handle>) {
-        next unless $line =~ /(\S+) \t (\S+)/x;
-        $consumables{$1} = $2;
     }
 
     close $handle;
@@ -711,7 +633,7 @@ sub _setGenericProperties {
         next unless $value;
         # safety checks
         if (! exists $ports->{$value}) {
-            $logger->error(
+            $logger->warning(
                 "unknown interface $value for IP address $suffix, ignoring"
             ) if $logger;
             next;
@@ -721,6 +643,7 @@ sub _setGenericProperties {
             next;
         }
         $ports->{$value}->{IP} = $suffix;
+        push @{$ports->{$value}->{IPS}->{IP}}, $suffix;
     }
 
     $device->{PORTS}->{PORT} = $ports;
@@ -733,36 +656,95 @@ sub _setPrinterProperties {
     my $snmp   = $params{snmp};
     my $logger = $params{logger};
 
-    # consumable levels
-    foreach my $index (1 .. 10) {
-        my $description_oid = '.1.3.6.1.2.1.43.11.1.1.6.1.' . $index;
-        my $description = hex2char($snmp->get($description_oid));
-        last unless $description;
+    # colors
+    my $colors = $snmp->walk('.1.3.6.1.2.1.43.12.1.1.4.1');
 
-        my $max_oid     = '.1.3.6.1.2.1.43.11.1.1.8.1.' . $index;
-        my $current_oid = '.1.3.6.1.2.1.43.11.1.1.9.1.' . $index;
-        my $max     = $snmp->get($max_oid);
-        my $current = $snmp->get($current_oid);
+    # consumable levels
+    my $color_ids      = $snmp->walk('.1.3.6.1.2.1.43.11.1.1.3.1');
+    my $type_ids       = $snmp->walk('.1.3.6.1.2.1.43.11.1.1.5.1');
+    my $descriptions   = $snmp->walk('.1.3.6.1.2.1.43.11.1.1.6.1');
+    my $unit_ids       = $snmp->walk('.1.3.6.1.2.1.43.11.1.1.7.1');
+    my $max_levels     = $snmp->walk('.1.3.6.1.2.1.43.11.1.1.8.1');
+    my $current_levels = $snmp->walk('.1.3.6.1.2.1.43.11.1.1.9.1');
+
+    foreach my $consumable_id (sort keys %$descriptions) {
+        my $max         = $max_levels->{$consumable_id};
+        my $current     = $current_levels->{$consumable_id};
         next unless defined $max and defined $current;
 
         # consumable identification
-        my $variable =
-            _getConsumableVariableFromDescription(
-                datadir     => $params{datadir},
-                description => $description
-            );
-        next unless $variable;
+        my $type_id  = $type_ids->{$consumable_id};
+        my $color_id = $color_ids->{$consumable_id};
+
+        my $type;
+        if ($type_id != 1) {
+            $type = $consumable_types{$type_id};
+        } else {
+            # fallback on description
+            my $description = $descriptions->{$consumable_id};
+            $type =
+                $description =~ /maintenance/i ? 'MAINTENANCEKIT' :
+                $description =~ /fuser/i       ? 'FUSERKIT'       :
+                $description =~ /transfer/i    ? 'TRANSFERKIT'    :
+                                                 undef            ;
+        }
+
+        if (!$type) {
+            $logger->debug("unknown consumable type $type_id") if $logger;
+            next;
+        }
+
+        if ($type eq 'TONER' || $type eq 'DRUM' || $type eq 'CARTRIDGE' || $type eq 'DEVELOPER') {
+            my $color;
+            if ($color_id) {
+                $color = hex2char($colors->{$color_id});
+                if (!$color) {
+                    $logger->debug("invalid color ID $color_id") if $logger;
+                    next;
+                }
+            } else {
+                # fallback on description
+                my $description = $descriptions->{$consumable_id};
+                $color =
+                    $description =~ /cyan/i           ? 'cyan'    : 
+                    $description =~ /magenta/i        ? 'magenta' : 
+                    $description =~ /(yellow|jaune)/i ? 'yellow'  : 
+                    $description =~ /(black|noir)/i   ? 'black'   : 
+                                                        'black'   ;
+            }
+            $type .= uc($color);
+        }
 
         my $value;
-        if ($current == -3) {
-            # OK means 100% for a container, but 0% for a receptacle
-            $value = $variable eq 'WASTETONER' ? 0 : 100;
+        if ($current == -2) {
+            # A value of -2 means unknown
+            $value = undef;
+        } elsif ($current == -3) {
+            # A value of -3 means that the printer knows that there is some
+            # supply/remaining space, respectively.
+            $value = 'OK';
         } else {
-            $value = _getPercentValue($max, $current);
+            if ($max != -2) {
+                $value = _getPercentValue($max, $current);
+            } else {
+                # PrtMarkerSuppliesSupplyUnitTC in Printer MIB
+                my $unit_id = $unit_ids->{$consumable_id};
+                $value =
+                    $unit_id == 19 ?  $current                         :
+                    $unit_id == 18 ?  $current         . 'items'       :
+                    $unit_id == 17 ?  $current         . 'm'           :
+                    $unit_id == 16 ?  $current         . 'feet'        :
+                    $unit_id == 15 ? ($current / 10)   . 'ml'          :
+                    $unit_id == 13 ? ($current / 10)   . 'g'           :
+                    $unit_id == 11 ?  $current         . 'hours'       :
+                    $unit_id ==  8 ?  $current         . 'sheets'      :
+                    $unit_id ==  7 ?  $current         . 'impressions' :
+                    $unit_id ==  4 ? ($current / 1000) . 'mm'          :
+                                      $current         . '?'           ;
+            }
         }
-        next unless defined $value;
 
-        $device->{CARTRIDGES}->{$variable} = $value;
+        $device->{CARTRIDGES}->{$type} = $value;
     }
 
     # page counters
@@ -777,44 +759,6 @@ sub _setPrinterProperties {
         }
         $device->{PAGECOUNTERS}->{$key} = $value;
     }
-}
-
-sub _getConsumableVariableFromDescription {
-    my (%params) = @_;
-
-    my $description = $params{description};
-    return unless $description;
-
-    _loadConsumablesDatabase(%params) if !%consumables;
-
-    foreach my $key (keys %consumables) {
-        return $consumables{$key} if $description =~ /$key/;
-    }
-
-    # find type
-    my $type;
-    foreach my $rule (@consumable_type_rules) {
-        next unless $description =~ $rule->{match};
-        $type = $rule->{value};
-        last;
-    }
-    return unless $type;
-
-    my $result = $consumable_variables_from_type{$type};
-    # for waste and toner, type is enough
-    return $result unless ref $result;
-
-    # otherwise, let's find subtype
-
-    my $subtype;
-    foreach my $rule (@consumable_subtype_rules) {
-        next unless $description =~ $rule->{match};
-        $subtype = $rule->{value};
-        last;
-    }
-    return unless $subtype;
-
-    return $consumable_variables_from_type{$type}->{$subtype};
 }
 
 sub _setNetworkingProperties {
@@ -849,6 +793,12 @@ sub _setNetworkingProperties {
         snmp         => $snmp,
         ports        => $ports,
         logger       => $logger,
+    );
+
+    _setAggregatePorts(
+        snmp   => $snmp,
+        ports  => $ports,
+        logger => $logger
     );
 }
 
@@ -901,8 +851,8 @@ sub _getCanonicalString {
     $value = hex2char($value);
     return unless $value;
 
-    $value =~ s/^["']//;
-    $value =~ s/["']$//;
+    $value =~ s/^\\?["']//;
+    $value =~ s/\\?["']$//;
     return unless $value;
 
     return $value;
@@ -1121,7 +1071,7 @@ sub _setConnectedDevices {
         foreach my $interface_id (keys %$lldp_info) {
             # safety check
             if (! exists $ports->{$interface_id}) {
-                $logger->error(
+                $logger->warning(
                     "unknown interface $interface_id in LLDP info, ignoring"
                 ) if $logger;
                 next;
@@ -1142,7 +1092,7 @@ sub _setConnectedDevices {
         foreach my $interface_id (keys %$cdp_info) {
             # safety check
             if (! exists $ports->{$interface_id}) {
-                $logger->error(
+                $logger->warning(
                     "unknown interface $interface_id in CDP info, ignoring"
                 ) if $logger;
                 next;
@@ -1160,7 +1110,7 @@ sub _setConnectedDevices {
                     }
                 } else {
                     # undecidable situation
-                    $logger->error(
+                    $logger->warning(
                         "multiple neighbors found by LLDP and CDP for " .
                         "interface $interface_id, ignoring"
                     );
@@ -1180,7 +1130,7 @@ sub _setConnectedDevices {
         foreach my $interface_id (keys %$edp_info) {
             # safety check
             if (! exists $ports->{$interface_id}) {
-                $logger->error(
+                $logger->warning(
                     "unknown interface $interface_id in EDP info, ignoring"
                 ) if $logger;
                 next;
@@ -1198,7 +1148,7 @@ sub _setConnectedDevices {
                     }
                 } else {
                     # undecidable situation
-                    $logger->error(
+                    $logger->warning(
                         "multiple neighbors found by LLDP and EDP for " .
                         "interface $interface_id, ignoring"
                     );
@@ -1319,7 +1269,7 @@ sub _getCDPInfo {
         # warning: multiple neighbors announcement for the same interface
         # usually means a non-CDP aware intermediate equipement
         if ($results->{$interface_id}) {
-            $logger->error(
+            $logger->warning(
                 "multiple neighbors found by CDP for interface $interface_id," .
                 " ignoring"
             );
@@ -1374,7 +1324,7 @@ sub _getEDPInfo {
         # warning: multiple neighbors announcement for the same interface
         # usually means a non-EDP aware intermediate equipement
         if ($results->{$interface_id}) {
-            $logger->error(
+            $logger->warning(
                 "multiple neighbors found by EDP for interface $interface_id," .
                 " ignoring"
             );
@@ -1517,6 +1467,76 @@ sub _getTrunkPorts {
     }
 
     return;
+}
+
+sub _setAggregatePorts {
+    my (%params) = @_;
+
+    my $ports  = $params{ports};
+    my $logger = $params{logger};
+
+    my $lacp_info = _getLACPInfo(%params);
+    if ($lacp_info) {
+        foreach my $interface_id (keys %$lacp_info) {
+            # safety check
+            if (!$ports->{$interface_id}) {
+                $logger->warning(
+                    "unknown interface $interface_id in LACP info, ignoring"
+                ) if $logger;
+                next;
+            }
+            $ports->{$interface_id}->{AGGREGATE}->{PORT} = $lacp_info->{$interface_id};
+        }
+    }
+
+    my $pagp_info = _getPAGPInfo(%params);
+    if ($pagp_info) {
+        foreach my $interface_id (keys %$pagp_info) {
+            # safety check
+            if (!$ports->{$interface_id}) {
+                $logger->error(
+                    "unknown interface $interface_id in PAGP info, ignoring"
+                ) if $logger;
+                next;
+            }
+            $ports->{$interface_id}->{AGGREGATE}->{PORT} = $pagp_info->{$interface_id};
+        }
+    }
+}
+
+sub _getLACPInfo {
+    my (%params) = @_;
+
+    my $snmp = $params{snmp};
+
+    my $results;
+    my $aggPortAttachedAggID = $snmp->walk('.1.2.840.10006.300.43.1.2.1.1.13');
+
+    foreach my $interface_id (sort keys %$aggPortAttachedAggID) {
+        my $aggregator_id = $aggPortAttachedAggID->{$interface_id};
+        next if $aggregator_id == 0;
+        next if $aggregator_id == $interface_id;
+        push @{$results->{$aggregator_id}}, $interface_id;
+    }
+
+    return $results;
+}
+
+sub _getPAGPInfo {
+    my (%params) = @_;
+
+    my $snmp = $params{snmp};
+
+    my $results;
+    my $pagpPorts = $snmp->walk('.1.3.6.1.4.1.9.9.98.1.1.1.1.5');
+
+    while (my ($port_id, $portShortNum) = each %{$pagpPorts}) {
+        next unless $portShortNum > 0;
+        my $aggregatePort_id = $portShortNum + 5000;
+        push @{$results->{$aggregatePort_id}}, $port_id;
+    }
+
+    return $results;
 }
 
 1;

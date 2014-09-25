@@ -4,8 +4,6 @@ use strict;
 use warnings;
 
 use English qw(-no_match_vars);
-use Win32;
-use Win32::OLE('in');
 use Win32::TieRegistry (
     Delimiter   => '/',
     ArrayValues => 0,
@@ -56,11 +54,19 @@ sub doInventory {
             inventory => $inventory,
             is64bit   => 1
         );
-        _loadUserSoftware(
-            inventory => $inventory,
-            is64bit   => 1,
-            logger    => $logger
-        ) if $params{scan_profiles};
+
+        if ($params{scan_profiles}) {
+            _loadUserSoftware(
+                inventory => $inventory,
+                is64bit   => 1,
+                logger    => $logger
+            );
+        } else {
+            $logger->info(
+                "'scan-profiles' configuration parameter disabled, " .
+                "ignoring software in user profiles"
+            );
+        }
 
         my $machKey32 = $Registry->Open('LMachine', {
             Access => KEY_READ | KEY_WOW64_32 ## no critic (ProhibitBitwise)

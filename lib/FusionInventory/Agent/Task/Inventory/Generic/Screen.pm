@@ -12,42 +12,19 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Generic;
 
 sub isEnabled {
-
-    return
-        $OSNAME eq 'MSWin32'                 ||
-        -d '/sys'                            ||
-        canRun('monitor-get-edid-using-vbe') ||
-        canRun('monitor-get-edid')           ||
-        canRun('get-edid');
+    my (%params) = @_;
+    return 0 if $params{no_category}->{monitor};
+    return 1;
 }
 
 sub doInventory {
     my (%params) = @_;
 
     my $inventory = $params{inventory};
+    my $logger    = $params{logger};
+    my $datadir   = $params{datadir};
 
-    foreach my $screen (_getScreens(
-        logger  => $params{logger},
-    )) {
-
-        if ($screen->{edid}) {
-            my $info = _getEdidInfo(
-                edid    => $screen->{edid},
-                logger  => $params{logger},
-                datadir => $params{datadir},
-            );
-            $screen->{CAPTION}      = $info->{CAPTION};
-            $screen->{DESCRIPTION}  = $info->{DESCRIPTION};
-            $screen->{MANUFACTURER} = $info->{MANUFACTURER};
-            $screen->{SERIAL}       = $info->{SERIAL};
-
-            $screen->{BASE64} = encode_base64($screen->{edid});
-        }
-
-        if (defined($screen->{edid})) {
-            delete $screen->{edid};
-        }
-
+    foreach my $screen (_getScreens(logger => $logger, datadir => $datadir)) {
         $inventory->addEntry(
             section => 'MONITORS',
             entry   => $screen
@@ -59,7 +36,12 @@ sub _getEdidInfo {
     my (%params) = @_;
 
     Parse::EDID->require();
-    return if $EVAL_ERROR;
+    if ($EVAL_ERROR) {
+        $params{logger}->debug(
+            "Parse::EDID Perl module not available, unable to parse EDID data"
+        ) if $params{logger};
+        return;
+    }
 
     my $edid = Parse::EDID::parse_edid($params{edid});
     if (my $error = Parse::EDID::check_parsed_edid($edid)) {
@@ -119,11 +101,6 @@ sub _getScreensFromWindows {
     my (%params) = @_;
 
     FusionInventory::Agent::Tools::Win32->use();
-    if ($EVAL_ERROR) {
-        print
-            "Failed to load FusionInventory::Agent::Tools::Win32: $EVAL_ERROR";
-        return;
-    }
 
     my @screens;
 
@@ -177,9 +154,11 @@ sub _getScreensFromWindows {
 sub _getScreensFromUnix {
     my (%params) = @_;
 
-    my @screens;
+    my $logger = $params{logger};
+    $logger->debug("retrieving EDID data:");
 
     if (-d '/sys/devices') {
+        my @screens;
         my $wanted = sub {
             return unless $_ eq 'edid';
             return unless -e $File::Find::name;
@@ -190,30 +169,94 @@ sub _getScreensFromUnix {
         no warnings 'File::Find';
         File::Find::find($wanted, '/sys/devices');
 
+        $logger->debug_result(
+            action => 'reading /sys/devices content',
+            data   => scalar @screens
+        );
+
         return @screens if @screens;
+    } else {
+        $logger->debug_result(
+            action => 'reading /sys/devices content',
+            status => 'directory not available'
+        );
     }
 
-    my $edid =
-        getAllLines(command => 'monitor-get-edid-using-vbe') ||
-        getAllLines(command => 'monitor-get-edid');
-    push @screens, { edid => $edid };
+    if (canRun('monitor-get-edid-using-vbe')) {
+        my $edid = getAllLines(command => 'monitor-get-edid-using-vbe');
+        $logger->debug_result(
+            action => 'running monitor-get-edid-using-vbe command',
+            data   => $edid
+        );
+        return { edid => $edid } if $edid;
+    } else {
+        $logger->debug_result(
+            action => 'running monitor-get-edid-using-vbe command',
+            status => 'command not available'
+        );
+    }
 
-    return @screens if @screens;
+    if (canRun('monitor-get-edid')) {
+        my $edid = getAllLines(command => 'monitor-get-edid');
+        $logger->debug_result(
+            action => 'running monitor-get-edid command',
+            data   => $edid
+        );
+        return { edid => $edid } if $edid;
+    } else {
+        $logger->debug_result(
+            action => 'running monitor-get-edid command',
+            status => 'command not available'
+        );
+    }
 
-    foreach (1..5) { # Sometime get-edid return an empty string...
-        $edid = getFirstLine(command => 'get-edid');
-        if ($edid) {
-            push @screens, { edid => $edid };
-            last;
+    if (canRun('get-edid')) {
+        my $edid;
+        foreach (1..5) { # Sometime get-edid return an empty string...
+            $edid = getFirstLine(command => 'get-edid');
+            last if $edid;
         }
+        $logger->debug_result(
+            action => 'running get-edid command',
+            data   => $edid
+        );
+        return { edid => $edid } if $edid;
+    } else {
+        $logger->debug_result(
+            action => 'running get-edid command',
+            status => 'command not available'
+        );
     }
 
-    return @screens;
+    return;
 }
 
 sub _getScreens {
-    return $OSNAME eq 'MSWin32' ?
-        _getScreensFromWindows(@_) : _getScreensFromUnix(@_);
+    my (%params) = @_;
+
+    my @screens = $OSNAME eq 'MSWin32' ?
+        _getScreensFromWindows(%params) :
+        _getScreensFromUnix(%params);
+
+    foreach my $screen (@screens) {
+        next unless $screen->{edid};
+
+        my $info = _getEdidInfo(
+            edid    => $screen->{edid},
+            logger  => $params{logger},
+            datadir => $params{datadir},
+        );
+        $screen->{CAPTION}      = $info->{CAPTION};
+        $screen->{DESCRIPTION}  = $info->{DESCRIPTION};
+        $screen->{MANUFACTURER} = $info->{MANUFACTURER};
+        $screen->{SERIAL}       = $info->{SERIAL};
+
+        $screen->{BASE64} = encode_base64($screen->{edid});
+
+        delete $screen->{edid};
+    }
+
+    return @screens;
 }
 
 1;

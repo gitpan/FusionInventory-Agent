@@ -7,6 +7,8 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Unix;
 
 sub isEnabled {
+    my (%params) = @_;
+    return 0 if $params{no_category}->{drive};
     return
         canRun('df') ||
         canRun('lshal');
@@ -42,7 +44,7 @@ sub _getFilesystems {
         foreach my $filesystem (@filesystems) {
             $filesystem->{SERIAL} = getFirstMatch(
                 logger  => $logger,
-                command => "blkid $filesystem->{VOLUMN}",
+                command => "blkid -w /dev/null $filesystem->{VOLUMN}",
                 pattern => qr/\sUUID="(\S*)"\s/
             );
         }

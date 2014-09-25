@@ -20,8 +20,7 @@ sub doInventory {
         '${Package}\t' .
         '${Architecture}\t' .
         '${Version}\t'.
-        '${Installed-Size}\t' .
-        '${Description}\n' .
+        '${Installed-Size}\n' .
         '\'';
 
     my $packages = _getPackagesList(
@@ -29,7 +28,16 @@ sub doInventory {
     );
     return unless $packages;
 
+    # mimic RPM inventory behaviour, as GLPI aggregates software
+    # based on name and publisher
+    my $publisher = getFirstMatch(
+        logger  => $logger,
+        pattern => qr/^Distributor ID:\s(.+)/,
+        command => 'lsb_release -i',
+    );
+
     foreach my $package (@$packages) {
+        $package->{PUBLISHER} = $publisher;
         $inventory->addEntry(
             section => 'SOFTWARES',
             entry   => $package

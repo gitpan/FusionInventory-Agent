@@ -140,12 +140,12 @@ sub _setSSLOptions {
         # certificate hostname
         IO::Socket::SSL->require();
         die
-            "failed to load IO::Socket::SSL, "                 .
-            "unable to perform SSL certificate validation.\n"  .
-            "You can use 'no-ssl-check' option to disable it."
+            "IO::Socket::SSL Perl module not available, "              .
+            "unable to validate SSL certificates "                     .
+            "(workaround: use 'no-ssl-check' configuration parameter)"
             if $EVAL_ERROR;
 
-        if ($self->{logger}{debug} >= 3) {
+        if ($self->{logger}{verbosity} > LOG_DEBUG2) {
             $Net::SSLeay::trace = 2;
         }
 
@@ -157,9 +157,10 @@ sub _setSSLOptions {
         } else {
             # SSL_verifycn_scheme and SSL_verifycn_name are required
             die
-                "IO::Socket::SSL $IO::Socket::SSL::VERSION is too old, "     .
-                "version 1.14 is required for SSL certificate validation.\n" .
-                " You can use 'no-ssl-check' option to disable SSL it."
+                "IO::Socket::SSL Perl module too old "                     .
+                "(available: $IO::Socket::SSL::VERSION, required: 1.14), " .
+                "unable to validate SSL certificates "                     .
+                "(workaround: use 'no-ssl-check' configuration parameter)"
                 if $IO::Socket::SSL::VERSION < 1.14;
 
             # use a custom HTTPS handler to workaround default LWP5 behaviour
@@ -167,11 +168,6 @@ sub _setSSLOptions {
                 ca_cert_file => $self->{ca_cert_file},
                 ca_cert_dir  => $self->{ca_cert_dir},
             );
-            die
-                "failed to load FusionInventory::Agent::HTTP::Protocol::https" .
-                ", unable to perform SSL certificate validation.\n"            .
-                "You can use 'no-ssl-check' option to disable it."
-                if $EVAL_ERROR;
 
             LWP::Protocol::implementor(
                 'https', 'FusionInventory::Agent::HTTP::Protocol::https'

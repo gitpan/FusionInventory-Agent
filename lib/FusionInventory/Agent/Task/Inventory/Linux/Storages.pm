@@ -6,9 +6,13 @@ use warnings;
 use English qw(-no_match_vars);
 
 use FusionInventory::Agent::Tools;
+use FusionInventory::Agent::Tools::Generic;
 use FusionInventory::Agent::Tools::Linux;
+use FusionInventory::Agent::Tools::Unix;
 
 sub isEnabled {
+    my (%params) = @_;
+    return 0 if $params{no_category}->{storage};
     return 1;
 }
 
@@ -18,10 +22,17 @@ sub doInventory {
     my $inventory = $params{inventory};
     my $logger    = $params{logger};
 
-    # get devices list from hal, if available, from sysfs otherwise
-    my @devices = canRun('lshal') ?
-        getDevicesFromHal(logger => $logger) :
-        getDevicesFromProc(logger => $logger);
+    foreach my $device (_getDevices(logger => $logger)) {
+        $inventory->addEntry(section => 'STORAGES', entry => $device);
+    }
+}
+
+sub _getDevices {
+    my (%params) = @_;
+
+    my $logger    = $params{logger};
+
+    my @devices = _getDevicesBase(logger => $logger);
 
     # complete with udev for missing bits, if available
     if (-d '/dev/.udev/db/') {
@@ -45,35 +56,20 @@ sub doInventory {
     if (_correctHdparmAvailable()) {
         foreach my $device (@devices) {
             next if $device->{SERIALNUMBER} && $device->{FIRMWARE};
-
-            my $handle = getFileHandle(
-                command => "hdparm -I /dev/$device->{NAME}",
+            my $info = getHdparmInfo(
+                device => "/dev/" . $device->{NAME},
                 logger  => $logger
             );
-            next unless $handle;
 
-            while (my $line = <$handle>) {
-                if ($line =~ /^\s+Serial Number\s*:\s*(.+)/i) {
-                    my $value = $1;
-                    $value =~ s/\s+$//;
-                    $device->{SERIALNUMBER} = $value
-                        if !$device->{SERIALNUMBER};
-                    next;
-                } elsif ($line =~ /^\s+Firmware Revision\s*:\s*(.+)/i) {
-                    my $value = $1;
-                    $value =~ s/\s+$//;
-                    $device->{FIRMWARE} = $value
-                        if !$device->{FIRMWARE};
-                    next;
-                } elsif ($line =~ /^\s*Transport:.*(SCSI|SATA|USB)/) {
-                    $device->{DESCRIPTION} = $1;
-                } elsif ($line =~ /^\s*Model Number:\s*(.*?)\s*$/) {
-                    $device->{MODEL} = $1;
-                } elsif ($line =~ /Logical Unit WWN Device Identifier:\s*(.*?)\s*$/) {
-                    $device->{WWN} = $1;
-                }
-            }
-            close $handle;
+            $device->{SERIALNUMBER} = $info->{serial}
+                if $info->{serial} && !$device->{SERIALNUMBER};
+
+            $device->{FIRMWARE} = $info->{firmware}
+                if $info->{firmware} && !$device->{FIRMWARE};
+
+            $device->{DESCRIPTION} = $info->{transport} if $info->{transport};
+            $device->{MODEL}       = $info->{model} if $info->{model};
+            $device->{WWN}         = $info->{wwn} if $info->{wwn};
         }
     }
 
@@ -93,12 +89,49 @@ sub doInventory {
             );
         }
 
-        if ($device->{DISKSIZE} && $device->{TYPE} =~ /^cd/) {
+        if (!$device->{DISKSIZE} && $device->{TYPE} !~ /^cd/) {
             $device->{DISKSIZE} = getDeviceCapacity(device => '/dev/' . $device->{NAME});
         }
-
-        $inventory->addEntry(section => 'STORAGES', entry => $device);
     }
+
+    return @devices;
+}
+
+sub _getDevicesBase {
+    my (%params) = @_;
+
+    my $logger = $params{logger};
+    $logger->debug("retrieving devices list:");
+
+    if (-d '/sys/block') {
+        my @devices = getDevicesFromProc(logger => $logger);
+        $logger->debug_result(
+            action => 'reading /sys/block content',
+            data   => scalar @devices
+        );
+        return @devices if @devices;
+    } else {
+        $logger->debug_result(
+            action => 'reading /sys/block content',
+            status => 'directory not available'
+        );
+    }
+
+    if (canRun('/usr/bin/lshal')) {
+        my @devices = getDevicesFromHal(logger => $logger);
+        $logger->debug_result(
+            action => 'running lshal command',
+            data   => scalar @devices
+        );
+        return @devices if @devices;
+    } else {
+        $logger->debug_result(
+            action => 'running lshal command',
+            status => 'command not available'
+        );
+    }
+
+    return;
 }
 
 sub _getDescription {

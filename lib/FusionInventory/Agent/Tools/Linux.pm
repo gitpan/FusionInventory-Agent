@@ -394,39 +394,34 @@ sub getInterfacesFromIp {
     my $handle = getFileHandle(%params);
     return unless $handle;
 
-    my @interfaces;
-    my $interface;
+    my (@interfaces, @addresses, $interface);
 
     while (my $line = <$handle>) {
-        if ($line =~ /^\d+:\s+(\S+): <([^>]+)>(.*)/) {
+        if ($line =~ /^\d+:\s+(\S+): <([^>]+)>/) {
+
+            if (@addresses) {
+                push @interfaces, @addresses;
+                undef @addresses;
+            } elsif ($interface) {
+                push @interfaces, $interface;
+            }
+
+            my ($name, $flags) = ($1, $2);
+            my $status =
+                (any { $_ eq 'UP' } split(/,/, $flags)) ? 'Up' : 'Down';
 
             $interface = {
-                DESCRIPTION => $1
+                DESCRIPTION => $name,
+                STATUS      => $status
             };
-
-            my $flags = $2;
-            my $remaining = $3;
-
-            if ($remaining =~ /state DOWN /) {
-                $interface->{STATUS} = 'Down';
-            } else {
-                foreach my $flag (split(/,/, $flags)) {
-                    next unless $flag eq 'UP' || $flag eq 'DOWN';
-                    $interface->{STATUS} = ucfirst(lc($flag));
-                }
-            }
         } elsif ($line =~ /link\/\S+ ($any_mac_address_pattern)?/) {
             $interface->{MACADDR} = $1;
-
-            # if courrent interface is not up, there won't be any address lines
-            push @interfaces, $interface
-                unless $interface->{STATUS} && $interface->{STATUS} eq 'Up';
         } elsif ($line =~ /inet6 (\S+)\/(\d{1,2})/) {
             my $address = $1;
             my $mask    = getNetworkMaskIPv6($2);
             my $subnet  = getSubnetAddressIPv6($address, $mask);
 
-            push @interfaces, {
+            push @addresses, {
                 IPADDRESS6  => $address,
                 IPMASK6     => $mask,
                 IPSUBNET6   => $subnet,
@@ -434,20 +429,35 @@ sub getInterfacesFromIp {
                 DESCRIPTION => $interface->{DESCRIPTION},
                 MACADDR     => $interface->{MACADDR}
             };
-        } elsif ($line =~ /inet ($ip_address_pattern)(?:\/(\d{1,3}))?/) {
+        } elsif ($line =~ /
+            inet \s
+            ($ip_address_pattern)(?:\/(\d{1,3}))? \s
+            .* \s
+            (\S+)$
+            /x) {
             my $address = $1;
             my $mask    = getNetworkMask($2);
             my $subnet  = getSubnetAddress($address, $mask);
+            my $name    = $3;
 
-            push @interfaces, {
+            # the name associated with the address differs from the current
+            # interface if the address is actually attached to an alias
+            push @addresses, {
                 IPADDRESS   => $address,
                 IPMASK      => $mask,
                 IPSUBNET    => $subnet,
                 STATUS      => $interface->{STATUS},
-                DESCRIPTION => $interface->{DESCRIPTION},
+                DESCRIPTION => $name,
                 MACADDR     => $interface->{MACADDR}
             };
         }
+    }
+
+    if (@addresses) {
+        push @interfaces, @addresses;
+        undef @addresses;
+    } elsif ($interface) {
+        push @interfaces, $interface;
     }
 
     return @interfaces;
@@ -523,7 +533,7 @@ Availables parameters:
 
 =head2 getInfoFromSmartctl(%params)
 
-Returns some information about a drive, using smartctl.
+Returns some information about a device, using smartctl.
 
 Availables parameters:
 

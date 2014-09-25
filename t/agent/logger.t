@@ -12,7 +12,7 @@ use Test::More;
 
 use FusionInventory::Agent::Logger;
 
-plan tests => 29;
+plan tests => 27;
 
 my $logger = FusionInventory::Agent::Logger->new();
 
@@ -110,8 +110,8 @@ ok(
 );
 
 $logger = FusionInventory::Agent::Logger->new(
-    backends => [ qw/Stderr/ ],
-    debug    => 1
+    backends  => [ qw/Stderr/ ],
+    verbosity => LOG_DEBUG
 );
 
 ok(
@@ -137,26 +137,20 @@ is(
 );
 
 is(
+    getStderrOutput(sub { $logger->warning('message'); }),
+    "[warning] message",
+    'warning message formating'
+);
+
+is(
     getStderrOutput(sub { $logger->error('message'); }),
     "[error] message",
     'error message formating'
 );
 
-is(
-    getStderrOutput(sub { $logger->fault('message'); }),
-    "[fault] message",
-    'fault message formating'
-);
-
-is(
-    getStderrOutput(sub { $logger->log(message => 'message'); }),
-    "[info] message",
-    'default logging level'
-);
-
 $logger = FusionInventory::Agent::Logger->new(
-    backends => [ qw/Stderr/ ],
-    debug    => 2
+    backends  => [ qw/Stderr/ ],
+    verbosity => LOG_DEBUG2
 );
 
 ok(
@@ -170,9 +164,9 @@ ok(
 );
 
 $logger = FusionInventory::Agent::Logger->new(
-    backends => [ qw/Stderr/ ],
-    config   => { color => 1 },
-    debug    => 1
+    backends  => [ qw/Stderr/ ],
+    config    => { color => 1 },
+    verbosity => LOG_DEBUG
 );
 
 is(
@@ -188,15 +182,15 @@ is(
 );
 
 is(
-    getStderrOutput(sub { $logger->error('message'); }),
-    "\033[1;35m[error] message\033[0m",
-    'error message color formating'
+    getStderrOutput(sub { $logger->warning('message'); }),
+    "\033[1;35m[warning] message\033[0m",
+    'warning message color formating'
 );
 
 is(
-    getStderrOutput(sub { $logger->fault('message'); }),
-    "\033[1;31m[fault] message\033[0m",
-    'fault message color formating'
+    getStderrOutput(sub { $logger->error('message'); }),
+    "\033[1;31m[error] message\033[0m",
+    'error message color formating'
 );
 
 # file backend tests
@@ -218,9 +212,9 @@ ok(
 
 $logfile = "$tmpdir/test2";
 $logger = FusionInventory::Agent::Logger->new(
-    backends => [ qw/File/ ],
-    config   => { logfile => $logfile },
-    debug    => 1
+    backends  => [ qw/File/ ],
+    config    => { logfile => $logfile },
+    verbosity => LOG_DEBUG
 );
 $logger->debug('message');
 
@@ -242,21 +236,15 @@ is(
 );
 
 is(
+    getFileOutput($logfile, sub { $logger->warning('message'); }),
+    '[' . localtime() . '][warning] message',
+    'warning message formating'
+);
+
+is(
     getFileOutput($logfile, sub { $logger->error('message'); }),
     '[' . localtime() . '][error] message',
     'error message formating'
-);
-
-is(
-    getFileOutput($logfile, sub { $logger->fault('message'); }),
-    '[' . localtime() . '][fault] message',
-    'fault message formating'
-);
-
-is(
-    getFileOutput($logfile, sub { $logger->log(message => 'message'); }),
-    '[' . localtime() . '][info] message',
-    'default logging level'
 );
 
 $logfile = "$tmpdir/test3";

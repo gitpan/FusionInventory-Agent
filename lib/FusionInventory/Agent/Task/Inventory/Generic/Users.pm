@@ -8,12 +8,12 @@ use FusionInventory::Agent::Tools;
 sub isEnabled {
     my (%params) = @_;
 
-    return if $params{no_category}->{process};
+    return if $params{no_category}->{user};
 
     return
         canRun('who')  ||
         canRun('last') ||
-        canRead('/etc/passwd');
+        -r '/etc/passwd';
 }
 
 sub doInventory {

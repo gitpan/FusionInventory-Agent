@@ -10,6 +10,8 @@ use FusionInventory::Agent::Tools::Network;
 use FusionInventory::Agent::Tools::Unix;
 
 sub isEnabled {
+    my (%params) = @_;
+    return 0 if $params{no_category}->{network};
     return canRun('ifconfig');
 }
 
@@ -19,20 +21,15 @@ sub doInventory {
     my $inventory = $params{inventory};
     my $logger    = $params{logger};
 
-    # set list of network interfaces
-    my $routes = getRoutingTable(logger => $logger);
     my @interfaces = _getInterfaces(logger => $logger);
-
     foreach my $interface (@interfaces) {
-        $interface->{IPGATEWAY} = $params{routes}->{$interface->{IPSUBNET}}
-            if $interface->{IPSUBNET};
-
         $inventory->addEntry(
             section => 'NETWORKS',
             entry   => $interface
         );
     }
 
+    my $routes = getRoutingTable(logger => $logger);
     $inventory->setHardware({
         DEFAULTGATEWAY => $routes->{'0.0.0.0'}
     });

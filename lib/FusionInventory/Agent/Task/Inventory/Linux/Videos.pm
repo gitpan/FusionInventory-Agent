@@ -7,6 +7,8 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Unix;
 
 sub isEnabled {
+    my (%params) = @_;
+    return 0 if $params{no_category}->{video};
     return 1;
 }
 
@@ -16,10 +18,25 @@ sub doInventory {
     my $inventory = $params{inventory};
     my $logger    = $params{logger};
 
-    my $ddcprobeData = _getDdcprobeData(
-        command => 'ddcprobe',
-        logger  => $logger
-    );
+    $logger->debug("retrieving display information:");
+
+    my $ddcprobeData;
+    if (canRun('ddcprobe')) {
+        $ddcprobeData = _getDdcprobeData(
+            command => 'ddcprobe',
+            logger  => $logger
+        );
+         $logger->debug_result(
+             action => 'running ddcprobe command',
+             data   => $ddcprobeData
+         );
+    } else {
+        $logger->debug_result(
+             action => 'running ddcprobe command',
+             status => 'command not available'
+        );
+    }
+
     my $xorgData;
 
     my $xorgPid;
@@ -41,7 +58,23 @@ sub doInventory {
 
     if ($xorgPid) {
         my $link = "/proc/$xorgPid/fd/0";
-        $xorgData = _parseXorgFd(file => $link) if -r $link;
+        if (-r $link) {
+            $xorgData = _parseXorgFd(file => $link);
+            $logger->debug_result(
+                 action => 'reading Xorg log file',
+                 data   => $xorgData
+            );
+        } else {
+            $logger->debug_result(
+                 action => 'reading Xorg log file',
+                 status => "non-readable link $link"
+            );
+        }
+    } else {
+        $logger->debug_result(
+             action => 'reading Xorg log file',
+             status => 'unable to get Xorg PID'
+        );
     }
 
     return unless $xorgData || $ddcprobeData;
@@ -52,6 +85,7 @@ sub doInventory {
         NAME       => $xorgData->{name}       || $ddcprobeData->{oem},
         RESOLUTION => $xorgData->{resolution} || $ddcprobeData->{dtiming},
         PCISLOT    => $xorgData->{pcislot},
+        PCIID      => $xorgData->{pciid},
     };
 
     if ($video->{MEMORY} && $video->{MEMORY} =~ s/kb$//i) {
@@ -110,11 +144,12 @@ sub _parseXorgFd {
         } elsif ($line =~ /Virtual size is (\S+)/i) {
             # VESA / XFree86
             $data->{resolution} = $1;
-        } elsif ($line =~ /Primary Device is: PCI (.+)/i) {
-            $data->{pcislot} = $1;
-            # mimic lspci pci slot format
-            $data->{pcislot} =~ s/^00@//;
-            $data->{pcislot} =~ s/(\d{2}):(\d{2}):(\d)$/$1:$2.$3/;
+        } elsif ($line =~ /
+            PCI: \* \( (?:\d+:)? (\d+) : (\d+) : (\d+) \) \s
+            (\w{4}:\w{4}:\w{4}:\w{4})?
+        /x) {
+            $data->{pcislot} = sprintf("%02d:%02d.%d", $1, $2, $3);
+            $data->{pciid}   = $4 if $4;
         } elsif ($line =~ /NOUVEAU\(0\): Chipset: "(.*)"/) {
             # Nouveau
             $data->{product} = $1;
