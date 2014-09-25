@@ -72,4 +72,4 @@ resources:
   homepage: http://www.fusioninventory.org
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/fusinv/fusioninventory-agent/
-version: 2.3.11
+version: 2.3.11.1
