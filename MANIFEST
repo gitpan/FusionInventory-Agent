@@ -794,6 +794,7 @@ resources/solaris/opensolaris/release-1
 resources/solaris/opensolaris/smbios-1
 resources/solaris/prtconf/sparc1
 resources/solaris/prtconf/sparc2
+resources/solaris/prtconf/sparc3
 resources/solaris/prtdiag/sample1
 resources/solaris/prtdiag/sample2
 resources/solaris/prtdiag/sample3
@@ -801,6 +802,7 @@ resources/solaris/prtdiag/sample4
 resources/solaris/prtdiag/sample5
 resources/solaris/prtdiag/sample6
 resources/solaris/prtdiag/sample7
+resources/solaris/prtdiag/sample8
 resources/solaris/psrinfo/e6900-psrinfo_v
 resources/solaris/psrinfo/e6900-psrinfo_vp
 resources/solaris/psrinfo/giration-psrinfo_v
@@ -826,12 +828,14 @@ resources/solaris/psrinfo/v240-psrinfo_v
 resources/solaris/psrinfo/v240-psrinfo_vp
 resources/solaris/psrinfo/v490-psrinfo_v
 resources/solaris/psrinfo/v490-psrinfo_vp
-resources/solaris/release-1
-resources/solaris/release-2
-resources/solaris/release-3
-resources/solaris/release-4
-resources/solaris/release-5
-resources/solaris/release-6
+resources/solaris/release/sample1
+resources/solaris/release/sample2
+resources/solaris/release/sample3
+resources/solaris/release/sample4
+resources/solaris/release/sample5
+resources/solaris/release/sample6
+resources/solaris/release/sample7
+resources/solaris/release/sample8
 resources/solaris/showrev/SPARC-1
 resources/solaris/showrev/SPARC-2
 resources/solaris/showrev/x86-1
@@ -900,6 +904,7 @@ resources/win32/registry/7ter-USB.reg
 resources/win32/registry/7ter-USBPRINT.reg
 resources/win32/registry/xp-CentralProcessor.reg
 resources/win32/registry/xp-uninstall.reg
+resources/win32/registry/xp-{4D36E972-E325-11CE-BFC1-08002BE10318}.reg
 resources/win32/registry/xppro1-USB.reg
 resources/win32/registry/xppro1-USBPRINT.reg
 resources/win32/registry/xppro2-USB.reg
@@ -1086,6 +1091,7 @@ t/tasks/inventory/windows/bios.t
 t/tasks/inventory/windows/cpu.t
 t/tasks/inventory/windows/drives.t
 t/tasks/inventory/windows/memory.t
+t/tasks/inventory/windows/networks.t
 t/tasks/inventory/windows/printers.t
 t/tasks/inventory/windows/registry.t
 t/tasks/inventory/windows/softwares.t

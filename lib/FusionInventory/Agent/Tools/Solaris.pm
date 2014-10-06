@@ -13,11 +13,12 @@ our @EXPORT = qw(
     getZone
     getPrtconfInfos
     getPrtdiagInfos
+    getReleaseInfo
 );
 
 memoize('getZone');
-memoize('getPrtconfInfos');
 memoize('getPrtdiagInfos');
+memoize('getReleaseInfo');
 
 sub getZone {
     return canRun('zonename') ?
@@ -64,18 +65,21 @@ sub getPrtconfInfos {
                 pop @parents;
             }
 
-            # attach a new node to parent node
-            my $parent_node = $parents[-1]->[0];
-            $parent_node->{$address} = {};
-
-            # and push it to the stack
-            push (@parents, [ $parent_node->{$address}, $level ]);
+            # push a new node on the stack
+            push (@parents, [ {}, $level ]);
 
             next;
         }
 
+        if ($line =~ /^\s* name: \s+ '(\S.*)'$/x) {
+            my $node   = $parents[-1]->[0];
+            my $parent = $parents[-2]->[0];
+            $parent->{$1} = $node;
+            next;
+        }
+
         # value
-        if ($line =~ /(\S[^:]+): \s+ (\S.*)$/x) {
+        if ($line =~ /^\s* (\S[^:]+): \s+ (\S.*)$/x) {
             my $key       = $1;
             my $raw_value = $2;
             my $node = $parents[-1]->[0];
@@ -328,6 +332,32 @@ sub _parseAnySection {
     return \@items;
 }
 
+sub getReleaseInfo {
+    my (%params) = (
+        file => '/etc/release',
+        @_
+    );
+
+    my $first_line = getFirstLine(
+        file    => $params{file},
+        logger  => $params{logger},
+    );
+
+    my ($fullname)            =
+        $first_line =~ /^ \s+ (.+)/x;
+    my ($version, $date, $id) =
+        $fullname =~ /Solaris \s ([\d.]+) \s (?: (\d+\/\d+) \s)? (\S+)/x;
+    my ($subversion) = $id =~ /_(u\d+)/;
+
+    return {
+        fullname   => $fullname,
+        version    => $version,
+        subversion => $subversion,
+        date       => $date,
+        id         => $id
+    };
+}
+
 1;
 __END__
 
@@ -361,10 +391,10 @@ turned into a hashref, hierarchically organised.
 $info = {
     'System Configuration' => 'Sun Microsystems  sun4u',
     'Memory size' => '32768 Megabytes',
-    '0xf00298fc' => {
+    'SUNW,Sun-Fire-V890' => {
         'banner-name' => 'Sun Fire V890',
         'model' => 'SUNW,501-7199',
-        '0xf007c538' => {
+        'memory-controller' => {
             'compatible' => [
                 'SUNW,UltraSPARC-III,mc',
                 'SUNW,mc'

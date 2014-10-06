@@ -61,7 +61,6 @@ requires:
   File::Which: 0
   LWP: '5.8'
   Net::IP: 0
-  Socket::GetAddrInfo: 0
   Text::Template: 0
   UNIVERSAL::require: 0
   XML::TreePP: '0.26'
@@ -72,4 +71,4 @@ resources:
   homepage: http://www.fusioninventory.org
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/fusinv/fusioninventory-agent/
-version: 2.3.11.1
+version: 2.3.12

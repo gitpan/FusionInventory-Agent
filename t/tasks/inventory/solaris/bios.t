@@ -126,19 +126,9 @@ my %smbios_tests = (
     }
 );
 
-my %prtconf_tests = (
-    'sparc1' => {
-        'compatible' => 'SUNW,Serengeti',
-        'device_type' => 'gptwo',
-        'banner-name' => 'Sun Fire E6900',
-        'name' => 'SUNW,Sun-Fire'
-    }
-);
-
 plan tests =>
     (scalar keys %showrev_tests) +
     (scalar keys %smbios_tests)  +
-    (scalar keys %prtconf_tests) +
     1;
 
 foreach my $test (keys %showrev_tests) {
@@ -151,10 +141,4 @@ foreach my $test (keys %smbios_tests) {
     my $file   = "resources/solaris/smbios/$test";
     my $result = FusionInventory::Agent::Task::Inventory::Solaris::Bios::_parseSmbios(file => $file);
     cmp_deeply($result, $smbios_tests{$test}, "smbios parsing: $test");
-}
-
-foreach my $test (keys %prtconf_tests) {
-    my $file   = "resources/solaris/prtconf/$test";
-    my $result = FusionInventory::Agent::Task::Inventory::Solaris::Bios::_parsePrtconf(file => $file);
-    cmp_deeply($result, $prtconf_tests{$test}, "prtconf parsing: $test");
 }

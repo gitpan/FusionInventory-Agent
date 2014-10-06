@@ -29,7 +29,7 @@ sub doInventory {
             if $interface->{IPADDRESS};
 
         delete $interface->{dns};
-        $interface->{TYPE} = _getType($interface->{PNPDEVICEID});
+        $interface->{TYPE} = _getMediaType($interface->{PNPDEVICEID});
 
         $inventory->addEntry(
             section => 'NETWORKS',
@@ -45,7 +45,7 @@ sub doInventory {
 
 }
 
-sub _getType {
+sub _getMediaType {
     my ($deviceId, $logger) = @_;
 
     return unless defined $deviceId;
@@ -55,7 +55,10 @@ sub _getType {
         logger => $logger
     );
 
-    foreach my $subkey (values %$key) {
+    foreach my $subkey_name (keys %$key) {
+        # skip variables
+        next if $subkey_name =~ m{^/};
+        my $subkey = $key->{$subkey_name};
         next unless
             $subkey->{'Connection/'}                     &&
             $subkey->{'Connection/'}->{'/PnpInstanceID'} &&
@@ -63,6 +66,7 @@ sub _getType {
         my $subtype = $subkey->{'Connection/'}->{'/MediaSubType'};
         return
             !defined $subtype        ? 'ethernet' :
+            $subtype eq '0x00000001' ? 'ethernet' :
             $subtype eq '0x00000002' ? 'wifi'     :
                                        undef;
     }
