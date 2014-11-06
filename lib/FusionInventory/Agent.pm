@@ -21,7 +21,7 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Hostname;
 use FusionInventory::Agent::XML::Query::Prolog;
 
-our $VERSION = '2.3.12';
+our $VERSION = '2.3.13';
 our $VERSION_STRING = _versionString($VERSION);
 our $AGENT_STRING = "FusionInventory-Agent_v$VERSION";
 
@@ -70,10 +70,6 @@ sub init {
         verbosity => $verbosity
     );
     $self->{logger} = $logger;
-
-    if ( $REAL_USER_ID != 0 ) {
-        $logger->info("You should run this program as super-user.");
-    }
 
     $logger->debug("Configuration directory: $self->{confdir}");
     $logger->debug("Data directory: $self->{datadir}");
@@ -126,32 +122,6 @@ sub init {
         exit 1;
     }
 
-    if ($config->{daemon} && !$config->{'no-fork'}) {
-
-        $logger->debug("Time to call Proc::Daemon");
-
-        Proc::Daemon->require();
-        if ($EVAL_ERROR) {
-            $logger->error("Can't load Proc::Daemon. Is the module installed?");
-            exit 1;
-        }
-
-        my $cwd = getcwd();
-        Proc::Daemon::Init();
-        $logger->debug("Daemon started");
-
-
-        # If we use relative path, we must stay in the current directory
-        if (substr( $params{libdir}, 0, 1 ) ne '/') {
-            chdir($cwd);
-        }
-
-        if ($self->_isAlreadyRunning()) {
-            $logger->debug("An agent is already runnnig, exiting...");
-            exit 1;
-        }
-    }
-
     # compute list of allowed tasks
     my %available = $self->getAvailableTasks(disabledTasks => $config->{'no-task'});
     my @tasks = keys %available;
@@ -168,11 +138,36 @@ sub init {
 
     $self->{tasks} = \@tasks;
 
+    if ($config->{daemon}) {
+        if ($self->_isAlreadyRunning()) {
+            $logger->debug("An agent is already running, exiting...");
+            exit 1;
+        }
+        if (!$config->{'no-fork'}) {
+
+            Proc::Daemon->require();
+            if ($EVAL_ERROR) {
+                $logger->error("Failed to load Proc::Daemon: $EVAL_ERROR");
+                exit 1;
+            }
+
+            my $cwd = getcwd();
+            Proc::Daemon::Init();
+
+            # If we use relative path, we must stay in the current directory
+            if (substr( $params{libdir}, 0, 1 ) ne '/') {
+                chdir($cwd);
+            }
+
+            $self->{logger}->debug("Agent daemonized");
+        }
+    }
+
     # create HTTP interface
     if (($config->{daemon} || $config->{service}) && !$config->{'no-httpd'}) {
         FusionInventory::Agent::HTTP::Server->require();
         if ($EVAL_ERROR) {
-            $logger->debug("Failed to load HTTP server: $EVAL_ERROR");
+            $logger->error("Failed to load HTTP server: $EVAL_ERROR");
         } else {
             $self->{server} = FusionInventory::Agent::HTTP::Server->new(
                 logger          => $logger,
@@ -186,7 +181,12 @@ sub init {
         }
     }
 
-    $logger->debug("FusionInventory Agent initialised");
+    # install signal handler to handle graceful exit
+    $SIG{INT}     = sub { $self->terminate(); exit 0; };
+    $SIG{TERM}    = sub { $self->terminate(); exit 0; };
+
+    $self->{logger}->info("FusionInventory Agent starting")
+        if $self->{config}->{daemon} || $self->{config}->{service};
 }
 
 sub run {
@@ -233,6 +233,14 @@ sub run {
     }
 }
 
+sub terminate {
+    my ($self) = @_;
+
+    $self->{logger}->info("FusionInventory Agent exiting")
+        if $self->{config}->{daemon} || $self->{config}->{service};
+    $self->{current_task}->abort() if $self->{current_task};
+}
+
 sub _runTarget {
     my ($self, $target) = @_;
 
@@ -255,6 +263,7 @@ sub _runTarget {
             deviceid => $self->{deviceid},
         );
 
+        $self->{logger}->info("sending prolog request to server $target->{id}");
         $response = $client->send(
             url     => $target->getUrl(),
             message => $prolog
@@ -294,13 +303,12 @@ sub _runTask {
             # child
             die "fork failed: $ERRNO" unless defined $pid;
 
-            $self->{logger}->debug("running task $name in process $PID");
+            $self->{logger}->debug("forking process $PID to handle task $name");
             $self->_runTaskReal($target, $name, $response);
             exit(0);
         }
     } else {
         # standalone mode: run each task directly
-        $self->{logger}->debug("running task $name");
         $self->_runTaskReal($target, $name, $response);
     }
 }
@@ -321,10 +329,10 @@ sub _runTaskReal {
         deviceid     => $self->{deviceid},
     );
 
-    if (!$task->isEnabled($response)) {
-        $self->{logger}->info("task $name execution not requested");
-        return;
-    }
+    return if !$task->isEnabled($response);
+
+    $self->{logger}->info("running task $name");
+    $self->{current_task} = $task;
 
     $task->run(
         user         => $self->{config}->{user},
@@ -334,6 +342,7 @@ sub _runTaskReal {
         ca_cert_dir  => $self->{config}->{'ca-cert-dir'},
         no_ssl_check => $self->{config}->{'no-ssl-check'},
     );
+    delete $self->{current_task};
 }
 
 sub getStatus {
@@ -461,7 +470,7 @@ sub _saveState {
 
 # compute an unique agent identifier, based on host name and current time
 sub _computeDeviceId {
-    my $hostname = FusionInventory::Agent::Tools::Hostname::getHostname();
+    my $hostname = getHostname();
 
     my ($year, $month , $day, $hour, $min, $sec) =
         (localtime (time))[5, 4, 3, 2, 1, 0];
@@ -515,6 +524,10 @@ Initialize the agent.
 =head2 run()
 
 Run the agent.
+
+=head2 terminate()
+
+Terminate the agent.
 
 =head2 getStatus()
 

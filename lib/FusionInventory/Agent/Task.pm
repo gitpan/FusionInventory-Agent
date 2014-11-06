@@ -28,21 +28,9 @@ sub new {
     return $self;
 }
 
-sub getOptionsFromServer {
-    my ($self, $response, $name, $feature) = @_;
-
-    if (!$response) {
-        $self->{logger}->debug("No server response");
-        return;
-    }
-
-    my $options = $response->getOptionsInfoByName($name);
-    if (!$options) {
-        $self->{logger}->debug("No $feature requested in the prolog");
-        return;
-    }
-
-    return $options;
+sub abort {
+    my ($self) = @_;
+    $self->{logger}->info("aborting task");
 }
 
 sub getModules {
@@ -117,6 +105,10 @@ This is a method to be implemented by each subclass.
 =head2 run()
 
 This is a method to be implemented by each subclass.
+
+=head2 abort()
+
+Abort running task immediatly.
 
 =head2 getOptionsFromServer($response, $name, $feature)
 

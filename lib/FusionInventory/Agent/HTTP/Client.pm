@@ -8,6 +8,7 @@ use HTTP::Status;
 use LWP::UserAgent;
 use UNIVERSAL::require;
 
+use FusionInventory::Agent;
 use FusionInventory::Agent::Logger;
 
 my $log_prefix = "[http client] ";
@@ -26,7 +27,6 @@ sub new {
                           FusionInventory::Agent::Logger->new(),
         user         => $params{user},
         password     => $params{password},
-        timeout      => $params{timeout} || 180,
         ssl_set      => 0,
         no_ssl_check => $params{no_ssl_check},
         ca_cert_dir  => $params{ca_cert_dir},
@@ -36,9 +36,11 @@ sub new {
 
     # create user agent
     $self->{ua} = LWP::UserAgent->new(
-        parse_head => 0, # No need to parse HTML
-        keep_alive => 1,
-        requests_redirectable => ['POST', 'GET', 'HEAD']
+        requests_redirectable => ['POST', 'GET', 'HEAD'],
+        agent                 => $FusionInventory::Agent::AGENT_STRING,
+        timeout               => $params{timeout} || 180,
+        parse_head            => 0, # No need to parse HTML
+        keep_alive            => 1,
     );
 
     if ($params{proxy}) {
@@ -46,9 +48,6 @@ sub new {
     }  else {
         $self->{ua}->env_proxy();
     }
-
-    $self->{ua}->agent($FusionInventory::Agent::AGENT_STRING);
-    $self->{ua}->timeout($self->{timeout});
 
     return $self;
 }
@@ -65,7 +64,7 @@ sub request {
     my $result = HTTP::Response->new( 500 );
     eval {
         if ($OSNAME eq 'MSWin32' && $scheme eq 'https') {
-            alarm $self->{timeout};
+            alarm $self->{ua}->timeout();
         }
         $result = $self->{ua}->request($request, $file);
         alarm 0;

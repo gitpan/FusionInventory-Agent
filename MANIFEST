@@ -7,10 +7,11 @@ bin/fusioninventory-netinventory
 bin/fusioninventory-wakeonlan
 bin/fusioninventory-win32-service
 Changes
-contrib/FusionInventory.adml
-contrib/FusionInventory.admx
-contrib/Tarballs.pm
+contrib/unix/fusioninventory-agent.init.redhat
+contrib/unix/fusioninventory-agent.service
 contrib/windows/fusioninventory-agent-deployment.vbs
+contrib/windows/FusionInventory.adml
+contrib/windows/FusionInventory.admx
 contrib/yum-plugin/fusioninventory-agent.conf
 contrib/yum-plugin/fusioninventory-agent.py
 contrib/yum-plugin/INSTALL
@@ -152,7 +153,6 @@ lib/FusionInventory/Agent/Task/Inventory/Linux/Distro/NonLSB.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/Drives.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/i386.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/i386/CPU.pm
-lib/FusionInventory/Agent/Task/Inventory/Linux/iLO.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/Inputs.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/LVM.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/m68k.pm
@@ -161,6 +161,8 @@ lib/FusionInventory/Agent/Task/Inventory/Linux/Memory.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/MIPS.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/MIPS/CPU.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/Networks.pm
+lib/FusionInventory/Agent/Task/Inventory/Linux/Networks/FibreChannel.pm
+lib/FusionInventory/Agent/Task/Inventory/Linux/Networks/iLO.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/PowerPC.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/PowerPC/Bios.pm
 lib/FusionInventory/Agent/Task/Inventory/Linux/PowerPC/CPU.pm
@@ -750,6 +752,7 @@ resources/linux/smartctl/sample1
 resources/linux/smartctl/sample2
 resources/linux/smartctl/sample3
 resources/linux/smartctl/sample4
+resources/linux/systool/sample1
 resources/linux/udev/ssd
 resources/lvm/linux/lvs/linux-1
 resources/lvm/linux/lvs/README
@@ -808,6 +811,8 @@ resources/solaris/psrinfo/e6900-psrinfo_vp
 resources/solaris/psrinfo/giration-psrinfo_v
 resources/solaris/psrinfo/giration-psrinfo_vp
 resources/solaris/psrinfo/sample1-psrinfo_v
+resources/solaris/psrinfo/solaris11-psrinfo_v
+resources/solaris/psrinfo/solaris11-psrinfo_vp
 resources/solaris/psrinfo/t1-psrinfo_v
 resources/solaris/psrinfo/t1-psrinfo_vp
 resources/solaris/psrinfo/t5120-psrinfo_v
@@ -915,6 +920,9 @@ resources/win32/wmi/2003-Win32_Processor.wmi
 resources/win32/wmi/2003SP2-Win32_PhysicalMemory.wmi
 resources/win32/wmi/2003SP2-Win32_PhysicalMemoryArray.wmi
 resources/win32/wmi/2003SP2-Win32_Processor.wmi
+resources/win32/wmi/2008-MSVM_ComputerSystem.wmi
+resources/win32/wmi/2008-MSVM_MemorySettingData.wmi
+resources/win32/wmi/2008-MSVM_ProcessorSettingData.wmi
 resources/win32/wmi/7-CIM_LogicalDevice.wmi
 resources/win32/wmi/7-Win32_NetworkAdapter.wmi
 resources/win32/wmi/7-Win32_NetworkAdapterConfiguration.wmi
@@ -1054,9 +1062,10 @@ t/tasks/inventory/hpux/storages.t
 t/tasks/inventory/hpux/uptime.t
 t/tasks/inventory/linux/cpu.t
 t/tasks/inventory/linux/drives.t
-t/tasks/inventory/linux/ilo.t
 t/tasks/inventory/linux/lvm.t
 t/tasks/inventory/linux/networks.t
+t/tasks/inventory/linux/networks/fibrechannel.t
+t/tasks/inventory/linux/networks/ilo.t
 t/tasks/inventory/linux/rhn-systemid.t
 t/tasks/inventory/linux/softwares.t
 t/tasks/inventory/linux/storages/adaptec.t
@@ -1096,7 +1105,6 @@ t/tasks/inventory/windows/printers.t
 t/tasks/inventory/windows/registry.t
 t/tasks/inventory/windows/softwares.t
 t/tasks/inventory/windows/usb.t
-t/tasks/network/message.t
 t/tasks/network/nmap.t
 t/tasks/wakeonlan.t
 THANKS

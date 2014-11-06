@@ -3,27 +3,17 @@ package FusionInventory::Agent::Task::NetInventory;
 use strict;
 use warnings;
 use threads;
-use threads::shared;
 use base 'FusionInventory::Agent::Task';
-
-use constant START => 0;
-use constant RUN   => 1;
-use constant STOP  => 2;
-use constant EXIT  => 3;
 
 use Encode qw(encode);
 use English qw(-no_match_vars);
+use Thread::Queue;
 use UNIVERSAL::require;
 
 use FusionInventory::Agent::XML::Query;
 use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Hardware;
 use FusionInventory::Agent::Tools::Network;
-
-# needed for perl < 5.10.1 compatbility
-if ($threads::shared::VERSION < 1.21) {
-    FusionInventory::Agent::Threads->use();
-}
 
 our $VERSION = '2.2.0';
 
@@ -34,16 +24,19 @@ our $VERSION = '2.2.0';
 sub isEnabled {
     my ($self, $response) = @_;
 
-    return unless
-        $self->{target}->isa('FusionInventory::Agent::Target::Server');
+    if (!$self->{target}->isa('FusionInventory::Agent::Target::Server')) {
+        $self->{logger}->debug("NetInventory task not compatible with local target");
+        return;
+    }
 
-    my $options = $self->getOptionsFromServer(
-        $response, 'SNMPQUERY', 'SNMPQuery'
-    );
-    return unless $options;
+    my $options = $response->getOptionsInfoByName('SNMPQUERY');
+    if (!$options) {
+        $self->{logger}->debug("NetInventory task execution not requested");
+        return;
+    }
 
     if (!$options->{DEVICE}) {
-        $self->{logger}->debug("No device defined in the prolog response");
+        $self->{logger}->error("no device defined");
         return;
     }
 
@@ -53,8 +46,6 @@ sub isEnabled {
 
 sub run {
     my ($self, %params) = @_;
-
-    $self->{logger}->debug("FusionInventory NetInventory task $VERSION");
 
     # task-specific client, if needed
     $self->{client} = FusionInventory::Agent::HTTP::Client::OCS->new(
@@ -72,77 +63,89 @@ sub run {
     my $max_threads = $options->{PARAM}->[0]->{THREADS_QUERY};
     my $timeout     = $options->{PARAM}->[0]->{TIMEOUT};
 
-    # SNMP models
-    my $models = _getIndexedModels($options->{MODEL});
-
     # SNMP credentials
     my $credentials = _getIndexedCredentials($options->{AUTHENTICATION});
 
-    # create the required number of threads, sharing variables
-    # for synchronisation
-    my @devices :shared = map { shared_clone($_) } @{$options->{DEVICE}};
-    my @results :shared;
-    my @states  :shared;
-
-    # no need for more threads than devices to scan
-    if ($max_threads > @devices) {
-        $max_threads = @devices;
-    }
-
-    #===================================
-    # Create all Threads
-    #===================================
-    for (my $i = 0; $i < $max_threads; $i++) {
-        $states[$i] = START;
-
-        threads->create(
-            '_queryDevices',
-            $self,
-            \$states[$i],
-            \@devices,
-            \@results,
-            $models,
-            $credentials,
-            $timeout,
-        )->detach();
-    }
+    # set internal state
+    $self->{pid} = $pid;
 
     # send initial message to the server
-    $self->_sendMessage({
-        AGENT => {
-            START        => 1,
-            AGENTVERSION => $FusionInventory::Agent::VERSION
-        },
-        MODULEVERSION => $VERSION,
-        PROCESSNUMBER => $pid
-    });
+    $self->_sendStartMessage();
 
-    # set all threads in RUN state
-    $_ = RUN foreach @states;
+    # initialize FIFOs
+    my $devices = Thread::Queue->new();
+    my $results = Thread::Queue->new();
 
-    # wait for all threads to reach EXIT state
-    while (any { $_ != EXIT } @states) {
-        delay(1);
+    foreach my $device (@{$options->{DEVICE}}) {
+        $devices->enqueue($device);
+    }
+    my $size = $devices->pending();
 
-        # send results to the server
-        while (my $result = do { lock @results; shift @results; }) {
-            my $data = {
-                DEVICE        => $result,
-                MODULEVERSION => $VERSION,
-                PROCESSNUMBER => $pid
+    # no need for more threads than devices to scan
+    my $threads_count = $max_threads > $size ? $size : $max_threads;
+
+    my $sub = sub {
+        my $id = threads->tid();
+        $self->{logger}->debug("[thread $id] creation");
+
+        # run as long as they are devices to process
+        while (my $device = $devices->dequeue_nb()) {
+
+            my $result;
+            eval {
+                $result = $self->_queryDevice(
+                    device      => $device,
+                    timeout     => $timeout,
+                    credentials => $credentials->{$device->{AUTHSNMP_ID}}
+                );
             };
-            $self->_sendMessage($data);
+            if ($EVAL_ERROR) {
+                chomp $EVAL_ERROR;
+                $result = {
+                    ERROR => {
+                        ID      => $device->{ID},
+                        TYPE    => $device->{TYPE},
+                        MESSAGE => $EVAL_ERROR
+                    }
+                };
+                $self->{logger}->error($EVAL_ERROR);
+            }
+
+            $results->enqueue($result) if $result;
         }
+
+        $self->{logger}->debug("[thread $id] termination");
+    };
+
+    $self->{logger}->debug("creating $threads_count worker threads");
+    for (my $i = 0; $i < $threads_count; $i++) {
+        threads->create($sub);
     }
 
+    # as long as some threads are still running...
+    while (threads->list(threads::running)) {
+
+        # send available results on the fly
+        while (my $result = $results->dequeue_nb()) {
+            $self->_sendResultMessage($result);
+        }
+
+        # wait for a second
+        delay(1);
+    }
+
+    # purge remaining results
+    while (my $result = $results->dequeue_nb()) {
+        $self->_sendResultMessage($result);
+    }
+
+    $self->{logger}->debug("cleaning $threads_count worker threads");
+    $_->join() foreach threads->list(threads::joinable);
+
     # send final message to the server
-    $self->_sendMessage({
-        AGENT => {
-            END => 1,
-        },
-        MODULEVERSION => $VERSION,
-        PROCESSNUMBER => $pid
-    });
+    $self->_sendStopMessage();
+
+    delete $self->{pid};
 }
 
 sub _sendMessage {
@@ -161,49 +164,39 @@ sub _sendMessage {
    );
 }
 
-sub _queryDevices {
-    my ($self, $state, $devices, $results, $models, $credentials, $timeout) = @_;
+sub _sendStartMessage {
+    my ($self) = @_;
 
-    my $logger = $self->{logger};
-    my $id     = threads->tid();
+    $self->_sendMessage({
+        AGENT => {
+            START        => 1,
+            AGENTVERSION => $FusionInventory::Agent::VERSION,
+        },
+        MODULEVERSION => $VERSION,
+        PROCESSNUMBER => $self->{pid}
+    });
+}
 
-    $logger->debug("Thread $id created in PAUSE state");
+sub _sendStopMessage {
+    my ($self) = @_;
 
-    # start: wait for state to change
-    while ($$state == START) {
-        delay(1);
-    }
+    $self->_sendMessage({
+        AGENT => {
+            END => 1,
+        },
+        MODULEVERSION => $VERSION,
+        PROCESSNUMBER => $self->{pid}
+    });
+}
 
-    # run: process available addresses until exhaustion
-    $logger->debug("Thread $id switched to RUN state");
+sub _sendResultMessage {
+    my ($self, $result) = @_;
 
-    while (my $device = do { lock @{$devices}; shift @{$devices}; }) {
-
-        my $result = $self->_queryDevice(
-            device      => $device,
-            timeout     => $timeout,
-            model       => $models->{$device->{MODELSNMP_ID}},
-            credentials => $credentials->{$device->{AUTHSNMP_ID}}
-        );
-
-        $result = {
-            ERROR => {
-                    ID      => $device->{ID},
-                    TYPE    => $device->{TYPE},
-                    MESSAGE => "No response from remote host"
-                }
-        } if !$result;
-
-        if ($result) {
-            lock $results;
-            push @$results, shared_clone($result);
-        }
-
-        delay(1);
-    }
-
-    $$state = EXIT;
-    $logger->debug("Thread $id switched to EXIT state");
+    $self->_sendMessage({
+        DEVICE        => $result,
+        MODULEVERSION => $VERSION,
+        PROCESSNUMBER => $self->{pid}
+    });
 }
 
 sub _queryDevice {
@@ -213,7 +206,7 @@ sub _queryDevice {
     my $device      = $params{device};
     my $logger      = $self->{logger};
     my $id          = threads->tid();
-    $logger->debug("thread $id: scanning $device->{ID}");
+    $logger->debug("[thread $id] scanning $device->{ID}");
 
     my $snmp;
     if ($device->{FILE}) {
@@ -223,10 +216,7 @@ sub _queryDevice {
                 file => $device->{FILE}
             );
         };
-        if ($EVAL_ERROR) {
-            $logger->error("Unable to create SNMP session for $device->{FILE}: $EVAL_ERROR");
-            return;
-        }
+        die "SNMP emulation error: $EVAL_ERROR" if $EVAL_ERROR;
     } else {
         eval {
             FusionInventory::Agent::SNMP::Live->require();
@@ -242,10 +232,7 @@ sub _queryDevice {
                 privprotocol => $credentials->{PRIVPROTOCOL},
             );
         };
-        if ($EVAL_ERROR) {
-            $logger->error("Unable to create SNMP session for $device->{IP}: $EVAL_ERROR");
-            return;
-        }
+        die "SNMP communication error: $EVAL_ERROR" if $EVAL_ERROR;
     }
 
     my $result = getDeviceFullInfo(
@@ -258,21 +245,6 @@ sub _queryDevice {
     );
 
     return $result;
-}
-
-sub _getIndexedModels {
-    my ($models) = @_;
-
-    foreach my $model (@{$models}) {
-        # index oids
-        $model->{oids} = {
-            map { $_->{OBJECT} => $_->{OID} }
-            @{$model->{GET}}, @{$model->{WALK}}
-        };
-    }
-
-    # index models by their ID
-    return { map { $_->{ID} => $_ } @{$models} };
 }
 
 sub _getIndexedCredentials {

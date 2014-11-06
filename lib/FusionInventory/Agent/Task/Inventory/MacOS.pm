@@ -18,37 +18,38 @@ sub doInventory {
     my $inventory = $params{inventory};
     my $logger    = $params{logger};
 
+    # basic operating system informations
+    my $kernelVersion = getFirstLine(command => 'uname -v');
+    my $kernelRelease = getFirstLine(command => 'uname -r');
+
+    my ($name, $version);
     my $infos = getSystemProfilerInfos(logger => $logger);
     my $SystemVersion =
         $infos->{'Software'}->{'System Software Overview'}->{'System Version'};
-
-    my ($OSName, $OSVersion);
     if ($SystemVersion =~ /^(.*?)\s+(\d+.*)/) {
-        $OSName = $1;
-        $OSVersion = $2;
+        $name = $1;
+        $version = $2;
     } else {
-        # Default values
-        $OSName = "Mac OS X";
+        $name = "Mac OS X";
     }
 
-    # add the uname -v as the comment, not really needed, but extra info
-    # never hurt
-    my $OSComment = getFirstLine(command => 'uname -v');
-    my $KernelVersion = getFirstLine(command => 'uname -r');
-    my $boottime = getFirstMatch(command => "sysctl -n kern.boottime", pattern => qr/sec = (\d+)/);
+    my $boottime = getFirstMatch(
+        command => "sysctl -n kern.boottime",
+        pattern => qr/sec = (\d+)/
+    );
 
     $inventory->setHardware({
-        OSNAME     => $OSName,
-        OSCOMMENTS => $OSComment,
-        OSVERSION  => $OSVersion,
+        OSNAME     => $name,
+        OSVERSION  => $version,
+        OSCOMMENTS => $kernelVersion,
     });
 
     $inventory->setOperatingSystem({
-        NAME                 => "MacOSX",
-        VERSION              => $OSVersion,
-        KERNEL_VERSION       => $KernelVersion,
-        FULL_NAME            => $OSName,
-        BOOT_TIME            => getFormatedLocalTime($boottime)
+        NAME           => "MacOSX",
+        FULL_NAME      => $name,
+        VERSION        => $version,
+        KERNEL_VERSION => $kernelRelease,
+        BOOT_TIME      => getFormatedLocalTime($boottime)
     });
 }
 

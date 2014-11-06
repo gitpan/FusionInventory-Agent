@@ -17,13 +17,16 @@ our $VERSION = '2.0';
 sub isEnabled {
     my ($self, $response) = @_;
 
-    return unless
-        $self->{target}->isa('FusionInventory::Agent::Target::Server');
+    if (!$self->{target}->isa('FusionInventory::Agent::Target::Server')) {
+        $self->{logger}->debug("WakeOnLan task not compatible with local target");
+        return;
+    }
 
-    my $options = $self->getOptionsFromServer(
-        $response, 'WAKEONLAN', 'WakeOnLan'
-    );
-    return unless $options;
+    my $options = $response->getOptionsInfoByName('WAKEONLAN');
+    if (!$options) {
+        $self->{logger}->debug("WakeOnLan task execution not requested");
+        return;
+    }
 
     my @addresses;
     foreach my $param (@{$options->{PARAM}}) {
@@ -37,7 +40,7 @@ sub isEnabled {
     }
 
     if (!@addresses) {
-        $self->{logger}->error("No mac address defined in the prolog response");
+        $self->{logger}->error("no mac address defined");
         return;
     }
 
@@ -47,8 +50,6 @@ sub isEnabled {
 
 sub run {
     my ($self, %params) = @_;
-
-    $self->{logger}->debug("FusionInventory WakeOnLan task $VERSION");
 
     my @methods = $params{methods} ? @{$params{methods}} : qw/ethernet udp/;
 

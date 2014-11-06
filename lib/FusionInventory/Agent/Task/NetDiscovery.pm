@@ -3,19 +3,14 @@ package FusionInventory::Agent::Task::NetDiscovery;
 use strict;
 use warnings;
 use threads;
-use threads::shared;
 use base 'FusionInventory::Agent::Task';
 
 use constant DEVICE_PER_MESSAGE => 4;
 
-use constant START => 0;
-use constant RUN   => 1;
-use constant STOP  => 2;
-use constant EXIT  => 3;
-
 use English qw(-no_match_vars);
 use Net::IP;
 use Time::localtime;
+use Thread::Queue;
 use UNIVERSAL::require;
 use XML::TreePP;
 
@@ -24,26 +19,24 @@ use FusionInventory::Agent::Tools::Network;
 use FusionInventory::Agent::Tools::Hardware;
 use FusionInventory::Agent::XML::Query;
 
-# needed for perl < 5.10.1 compatbility
-if ($threads::shared::VERSION < 1.21) {
-    FusionInventory::Agent::Threads->use();
-}
-
 our $VERSION = '2.2.0';
 
 sub isEnabled {
     my ($self, $response) = @_;
 
-    return unless
-        $self->{target}->isa('FusionInventory::Agent::Target::Server');
+    if (!$self->{target}->isa('FusionInventory::Agent::Target::Server')) {
+        $self->{logger}->debug("NetDiscovery task not compatible with local target");
+        return;
+    }
 
-    my $options = $self->getOptionsFromServer(
-        $response, 'NETDISCOVERY', 'NetDiscovery'
-    );
-    return unless $options;
+    my $options = $response->getOptionsInfoByName('NETDISCOVERY');
+    if (!$options) {
+        $self->{logger}->debug("NetDiscovery task execution not requested");
+        return;
+    }
 
     if (!$options->{RANGEIP}) {
-        $self->{logger}->debug("No IP range defined in the prolog response");
+        $self->{logger}->error("no IP range defined");
         return;
     }
 
@@ -53,8 +46,6 @@ sub isEnabled {
 
 sub run {
     my ($self, %params) = @_;
-
-    $self->{logger}->debug("FusionInventory NetDiscovery task $VERSION");
 
     # task-specific client, if needed
     $self->{client} = FusionInventory::Agent::HTTP::Client::OCS->new(
@@ -106,15 +97,13 @@ sub run {
         $snmp_credentials = $self->_getCredentials($options);
     }
 
+    # set internal state
+    $self->{pid} = $pid;
 
-    # create the required number of threads, sharing variables
-    # for synchronisation
-    my @addresses :shared;
-    my @results   :shared;
-    my @states    :shared;
+    # send initial message to the server
+    $self->_sendStartMessage();
 
-    # compute blocks list
-    my $addresses_count = 0;
+    # process each address block
     foreach my $range (@{$options->{RANGEIP}}) {
         my $block = Net::IP->new(
             $range->{IPSTART} . '-' . $range->{IPEND}
@@ -126,108 +115,87 @@ sub run {
             );
             next;
         }
-        $range->{block} = $block;
-        $addresses_count += $range->{block}->size();
-    }
 
-    # no need for more threads than addresses to scan
-    if ($max_threads > $addresses_count) {
-        $max_threads = $addresses_count;
-    }
-
-    for (my $i = 0; $i < $max_threads; $i++) {
-        $states[$i] = START;
-
-        threads->create(
-            '_scanAddresses',
-            $self,
-            \$states[$i],
-            \@addresses,
-            \@results,
-            $snmp_credentials,
-            $nmap_parameters,
-            $timeout
-        )->detach();
-    }
-
-    # send initial message to the server
-    $self->_sendMessage({
-        AGENT => {
-            START        => 1,
-            AGENTVERSION => $FusionInventory::Agent::VERSION,
-        },
-        MODULEVERSION => $VERSION,
-        PROCESSNUMBER => $pid
-    });
-
-    # set all threads in RUN state
-    $_ = RUN foreach @states;
-
-    # proceed each given IP block
-    foreach my $range (@{$options->{RANGEIP}}) {
-        my $block = $range->{block};
-        next unless $block;
-        do {
-            push @addresses, $block->ip(),
-        } while (++$block);
         $self->{logger}->debug(
-            "scanning range: $range->{IPSTART}-$range->{IPEND}"
+            "scanning block $range->{IPSTART}-$range->{IPEND}"
         );
 
+        # initialize FIFOs
+        my $addresses = Thread::Queue->new();
+        my $results   = Thread::Queue->new();
+
+        do {
+            $addresses->enqueue($block->ip()),
+        } while (++$block);
+        my $size = $addresses->pending();
+
         # send block size to the server
-        $self->_sendMessage({
-            AGENT => {
-                NBIP => scalar @addresses
-            },
-            PROCESSNUMBER => $pid
-        });
+        $self->_sendBlockMessage($size);
 
-        # set all threads in RUN state
-        $_ = RUN foreach @states;
+        # no need for more threads than addresses to scan in this range
+        my $threads_count = $max_threads > $size ? $size : $max_threads;
 
-        # wait for all threads to reach STOP state
-        while (any { $_ != STOP } @states) {
-            delay(1);
+        my $sub = sub {
+            my $id = threads->tid();
+            $self->{logger}->debug("[thread $id] creation");
 
-            # send results to the server
-            while (my $result = do { lock @results; shift @results; }) {
-                $result->{ENTITY} = $range->{ENTITY} if defined($range->{ENTITY});
-                my $data = {
-                    DEVICE        => [$result],
-                    MODULEVERSION => $VERSION,
-                    PROCESSNUMBER => $pid,
-                };
-                $self->_sendMessage($data);
+            # run as long as they are addresses to process
+            while (my $address = $addresses->dequeue_nb()) {
+
+                my $result = $self->_scanAddress(
+                    ip               => $address,
+                    timeout          => $timeout,
+                    nmap_parameters  => $nmap_parameters,
+                    snmp_credentials => $snmp_credentials,
+                );
+
+                $results->enqueue($result) if $result;
             }
+
+            $self->{logger}->debug("[thread $id] termination");
+        };
+
+        $self->{logger}->debug("creating $threads_count worker threads");
+        for (my $i = 0; $i < $threads_count; $i++) {
+            threads->create($sub);
         }
+
+        # as long as some threads are still running...
+        while (threads->list(threads::running)) {
+
+            # send available results on the fly
+            while (my $result = $results->dequeue_nb()) {
+                $result->{ENTITY} = $range->{ENTITY}
+                    if defined($range->{ENTITY});
+                $self->_sendResultMessage($result);
+            }
+
+            # wait for a second
+            delay(1);
+        }
+
+        # purge remaning results
+        while (my $result = $results->dequeue_nb()) {
+            $result->{ENTITY} = $range->{ENTITY}
+                if defined($range->{ENTITY});
+            $self->_sendResultMessage($result);
+        }
+
+        $self->{logger}->debug("cleaning $threads_count worker threads");
+        $_->join() foreach threads->list(threads::joinable);
     }
 
-    # set all threads in EXIT state
-    $_ = EXIT foreach @states;
-    delay(1);
-
     # send final message to the server
-    $self->_sendMessage({
-        AGENT => {
-            END => 1,
-        },
-        MODULEVERSION => $VERSION,
-        PROCESSNUMBER => $pid
-    });
+    $self->_sendStopMessage();
 
+    delete $self->{pid};
 }
 
-sub _sendUpdateMessage {
-    my ($self, $pid) = @_;
+sub abort {
+    my ($self) = @_;
 
-    $self->_sendMessage({
-        AGENT => {
-            END => '1'
-        },
-        MODULEVERSION => $VERSION,
-        PROCESSNUMBER => $pid,
-        DICO          => "REQUEST",
-    });
+    $self->_sendStopMessage() if $self->{pid};
+    $self->SUPER::abort();
 }
 
 sub _getCredentials {
@@ -250,52 +218,6 @@ sub _getCredentials {
     return \@credentials;
 }
 
-sub _scanAddresses {
-    my ($self, $state, $addresses, $results, $snmp_credentials, $nmap_parameters, $timeout) = @_;
-
-    my $logger = $self->{logger};
-    my $id     = threads->tid();
-
-    $logger->debug("Thread $id created");
-
-    # start: wait for state to change
-    while ($$state == START) {
-        delay(1);
-    }
-
-    OUTER: while (1) {
-        # run: process available addresses until exhaustion
-        $logger->debug("Thread $id switched to RUN state");
-
-        while (my $address = do { lock @{$addresses}; shift @{$addresses}; }) {
-
-            my $result = $self->_scanAddress(
-                ip               => $address,
-                timeout          => $timeout,
-                nmap_parameters  => $nmap_parameters,
-                snmp_credentials => $snmp_credentials,
-            );
-
-            if ($result) {
-                lock $results;
-                push @$results, shared_clone($result);
-            }
-        }
-
-        # stop: wait for state to change
-        $$state = STOP;
-        $logger->debug("Thread $id switched to STOP state");
-        while ($$state == STOP) {
-            delay(1);
-        }
-
-        # exit: exit thread
-        last OUTER if $$state == EXIT;
-    }
-
-    $logger->debug("Thread $id deleted");
-}
-
 sub _sendMessage {
     my ($self, $content) = @_;
 
@@ -316,7 +238,7 @@ sub _scanAddress {
 
     my $logger = $self->{logger};
     my $id     = threads->tid();
-    $logger->debug("thread $id: scanning $params{ip}...");
+    $logger->debug("[thread $id] scanning $params{ip}:");
 
     my %device = (
         $params{nmap_parameters} ? $self->_scanAddressByNmap(%params)    : (),
@@ -324,16 +246,20 @@ sub _scanAddress {
         $INC{'Net/SNMP.pm'}      ? $self->_scanAddressBySNMP(%params)    : ()
     );
 
+    # don't report anything without a minimal amount of information
+    return unless
+        $device{MAC}          ||
+        $device{SNMPHOSTNAME} ||
+        $device{DNSHOSTNAME}  ||
+        $device{NETBIOSNAME};
+
+    $device{IP} = $params{ip};
+
     if ($device{MAC}) {
         $device{MAC} =~ tr/A-F/a-f/;
     }
 
-    if ($device{MAC} || $device{DNSHOSTNAME} || $device{NETBIOSNAME}) {
-        $device{IP}     = $params{ip};
-        return \%device;
-    } else {
-        return;
-    }
+    return \%device;
 }
 
 sub _scanAddressByNmap {
@@ -344,7 +270,7 @@ sub _scanAddressByNmap {
     );
 
     $self->{logger}->debug(
-        sprintf "thread %d: scanning %s with nmap: %s",
+        sprintf "[thread %d] - scanning %s with nmap: %s",
         threads->tid(),
         $params{ip},
         $device ? 'success' : 'no result'
@@ -361,7 +287,7 @@ sub _scanAddressByNetbios {
     my $ns = $nb->node_status($params{ip});
 
     $self->{logger}->debug(
-        sprintf "thread %d: scanning %s with netbios: %s",
+        sprintf "[thread %d] - scanning %s with netbios: %s",
         threads->tid(),
         $params{ip},
         $ns ? 'success' : 'no result'
@@ -403,7 +329,7 @@ sub _scanAddressBySNMP {
 
         # no result means either no host, no response, or invalid credentials
         $self->{logger}->debug(
-            sprintf "thread %d: scanning %s with snmp credentials %d: %s",
+            sprintf "[thread %d] - scanning %s with SNMP, credentials %d: %s",
             threads->tid(),
             $params{ip},
             $credential->{ID},
@@ -436,24 +362,17 @@ sub _scanAddressBySNMPReal {
             privprotocol => $params{credential}->{PRIVPROTOCOL},
         );
     };
-    if ($EVAL_ERROR) {
-        # SNMPv3 exception for non-responding host
-        return if $EVAL_ERROR =~ /^No response from remote host/;
-        # SNMPv3 exception for invalid credentials
-        return if $EVAL_ERROR =~
-            /^Received usmStats(WrongDigests|UnknownUserNames)/;
-        # other exception
-        $self->{logger}->error(
-            "Unable to create SNMP session for $params{ip}: $EVAL_ERROR\n"
-        );
-        return;
-    }
+    # an exception here just means no device,  or wrong credentials
+    return if $EVAL_ERROR;
 
-    return getDeviceInfo(
-        snmp       => $snmp,
-        datadir    => $self->{datadir},
-        logger     => $self->{logger},
+    my $info = getDeviceInfo(
+        snmp    => $snmp,
+        datadir => $self->{datadir},
+        logger  => $self->{logger},
     );
+    return unless $info;
+
+    return %$info;
 }
 
 sub _parseNmap {
@@ -485,6 +404,52 @@ sub _parseNmap {
     }
 
     return $result;
+}
+
+sub _sendStartMessage {
+    my ($self) = @_;
+
+    $self->_sendMessage({
+        AGENT => {
+            START        => 1,
+            AGENTVERSION => $FusionInventory::Agent::VERSION,
+        },
+        MODULEVERSION => $VERSION,
+        PROCESSNUMBER => $self->{pid}
+    });
+}
+
+sub _sendStopMessage {
+    my ($self) = @_;
+
+    $self->_sendMessage({
+        AGENT => {
+            END => 1,
+        },
+        MODULEVERSION => $VERSION,
+        PROCESSNUMBER => $self->{pid}
+    });
+}
+
+sub _sendBlockMessage {
+    my ($self, $count) = @_;
+
+    $self->_sendMessage({
+        AGENT => {
+            NBIP => $count
+        },
+        PROCESSNUMBER => $self->{pid}
+    });
+}
+
+sub _sendResultMessage {
+    my ($self, $result) = @_;
+
+    $self->_sendMessage({
+        DEVICE        => [$result],
+        MODULEVERSION => $VERSION,
+        PROCESSNUMBER => $self->{pid}
+    });
 }
 
 1;

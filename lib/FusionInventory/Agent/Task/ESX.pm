@@ -16,7 +16,10 @@ our $VERSION = "2.2.1";
 sub isEnabled {
     my ($self) = @_;
 
-    return $self->{target}->isa('FusionInventory::Agent::Target::Server');
+    if (!$self->{target}->isa('FusionInventory::Agent::Target::Server')) {
+        $self->{logger}->debug("ESX task not compatible with local target");
+        return;
+    }
 }
 
 sub connect {
@@ -163,8 +166,6 @@ sub getHostIds {
 
 sub run {
     my ( $self, %params ) = @_;
-
-    $self->{logger}->debug("FusionInventory ESX task $VERSION");
 
     $self->{client} = FusionInventory::Agent::HTTP::Client::Fusion->new(
         logger       => $self->{logger},

@@ -2,10 +2,15 @@ package FusionInventory::Agent::Tools::Hostname;
 
 use strict;
 use warnings;
+use base 'Exporter';
 
 use UNIVERSAL::require();
 use Encode;
 use English qw(-no_match_vars);
+
+our @EXPORT = qw(
+    getHostname
+);
 
 BEGIN {
     if ($OSNAME eq 'MSWin32') {
@@ -19,12 +24,25 @@ BEGIN {
 }
 
 sub getHostname {
+    my (%params) = @_;
 
-    if ($OSNAME ne 'MSWin32') {
-        Sys::Hostname->require();
-        return Sys::Hostname::hostname();
+    my $hostname = $OSNAME eq 'MSWin32' ?
+        _getHostnameWindows() :
+        _getHostnameUnix()    ;
+
+    if ($params{short}) {
+        $hostname =~ s/\..*$//;
     }
 
+    return $hostname;
+}
+
+sub _getHostnameUnix {
+    Sys::Hostname->require();
+    return Sys::Hostname::hostname();
+}
+
+sub _getHostnameWindows {
     my $getComputerName = Win32::API->new(
         "kernel32", "GetComputerNameExW", ["I", "P", "P"], "N"
     );
@@ -33,9 +51,10 @@ sub getHostname {
 
     $getComputerName->Call(3, $buffer, $n);
 
-    # GetComputerNameExW returns the string in UTF16, we have to change it
-    # to UTF8
-    return substr(decode("UCS-2le", $buffer), 0, ord $n);
+    # convert from UTF16 to UTF8
+    my $hostname = substr(decode("UCS-2le", $buffer), 0, ord $n);
+
+    return $hostname || $ENV{COMPUTERNAME};
 }
 
 1;

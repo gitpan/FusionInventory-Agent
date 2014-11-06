@@ -247,7 +247,7 @@ sub getDeviceInfo {
     my $datadir = $params{datadir};
     my $logger  = $params{logger};
 
-    my %device;
+    my $device;
 
     # manufacturer, type and model identification attempt, using sysObjectID
     my $sysobjectid = $snmp->get('.1.3.6.1.2.1.1.2.0');
@@ -257,9 +257,9 @@ sub getDeviceInfo {
             datadir => $datadir,
             logger  => $logger
         );
-        $device{MANUFACTURER} = $manufacturer if $manufacturer;
-        $device{TYPE}         = $type         if $type;
-        $device{MODEL}        = $model        if $model;
+        $device->{MANUFACTURER} = $manufacturer if $manufacturer;
+        $device->{TYPE}         = $type         if $type;
+        $device->{MODEL}        = $model        if $model;
     }
 
     # vendor and type identification attempt, using sysDescr
@@ -271,47 +271,47 @@ sub getDeviceInfo {
         my $result = $sysdescr_first_word{lc($first_word)};
 
         if ($result) {
-            $device{VENDOR} = $result->{vendor} if $result->{vendor};
-            $device{TYPE}   = $result->{type}   if $result->{type};
+            $device->{VENDOR} = $result->{vendor} if $result->{vendor};
+            $device->{TYPE}   = $result->{type}   if $result->{type};
         }
 
         # whole sysdescr value
         foreach my $rule (@sysdescr_rules) {
             next unless $sysdescr =~ $rule->{match};
-            $device{VENDOR} = $rule->{vendor} if $rule->{vendor};
-            $device{TYPE}   = $rule->{type}   if $rule->{type};
+            $device->{VENDOR} = $rule->{vendor} if $rule->{vendor};
+            $device->{TYPE}   = $rule->{type}   if $rule->{type};
             last;
         }
-        $device{DESCRIPTION} = $sysdescr;
+        $device->{DESCRIPTION} = $sysdescr;
     }
 
     # fallback type identification attempt, using type-specific OID presence
-    if (!exists $device{TYPE}) {
+    if (!exists $device->{TYPE}) {
          if (
              $snmp->get('.1.3.6.1.2.1.43.11.1.1.6.1.1') ||
              $snmp->get('.1.3.6.1.2.1.25.3.2.1.3.1')
          ) {
-            $device{TYPE} = 'PRINTER'
+            $device->{TYPE} = 'PRINTER'
         }
     }
 
     # fallback model identification attempt, using type-specific OID value
-    if (!exists $device{MODEL}) {
-        my $model = exists $device{TYPE} && $device{TYPE} eq 'PRINTER' ?
+    if (!exists $device->{MODEL}) {
+        my $model = exists $device->{TYPE} && $device->{TYPE} eq 'PRINTER' ?
             $snmp->get('.1.3.6.1.2.1.25.3.2.1.3.1')    :
             $snmp->get('.1.3.6.1.2.1.47.1.1.1.1.13.1') ;
-        $device{MODEL} = $model if $model;
+        $device->{MODEL} = $model if $model;
     }
 
     # fallback manufacturer identification attempt, using type-agnostic OID
-    if (!exists $device{MANUFACTURER}) {
+    if (!exists $device->{MANUFACTURER}) {
         my $manufacturer = $snmp->get('.1.3.6.1.2.1.43.8.2.1.14.1.1');
-        $device{MANUFACTURER} = $manufacturer if $manufacturer;
+        $device->{MANUFACTURER} = $manufacturer if $manufacturer;
     }
 
     # fallback vendor, using manufacturer
-    if (!exists $device{VENDOR} && exists $device{MANUFACTURER}) {
-        $device{VENDOR} = $device{MANUFACTURER};
+    if (!exists $device->{VENDOR} && exists $device->{MANUFACTURER}) {
+        $device->{VENDOR} = $device->{MANUFACTURER};
     }
 
     # remaining informations
@@ -336,24 +336,24 @@ sub getDeviceInfo {
             $type eq 'count'  ? _getCanonicalCount($raw_value)  :
                                 $raw_value;
 
-        $device{$key} = $value if defined $value;
+        $device->{$key} = $value if defined $value;
     }
 
     my $mac = _getMacAddress($snmp);
-    $device{MAC} = $mac if $mac;
+    $device->{MAC} = $mac if $mac;
 
-    my $serial = _getSerial($snmp, $device{TYPE});
-    $device{SERIAL} = $serial if $serial;
+    my $serial = _getSerial($snmp, $device->{TYPE});
+    $device->{SERIAL} = $serial if $serial;
 
-    my $firmware = _getFirmware($snmp, $device{TYPE});
-    $device{FIRMWARE} = $firmware if $firmware;
+    my $firmware = _getFirmware($snmp, $device->{TYPE});
+    $device->{FIRMWARE} = $firmware if $firmware;
 
     my $results = $snmp->walk('.1.3.6.1.2.1.4.20.1.1');
-    $device{IPS}->{IP} =  [
+    $device->{IPS}->{IP} =  [
         sort values %{$results}
     ] if $results;
 
-    return %device;
+    return $device;
 }
 
 sub _getSysObjectIDInfo {
@@ -521,33 +521,33 @@ sub getDeviceFullInfo {
     my $logger = $params{logger};
 
     # first, let's retrieve basic device informations
-    my %info = getDeviceInfo(%params);
-    return unless %info;
+    my $info = getDeviceInfo(%params);
+    return unless $info;
 
     # description is defined as DESCRIPTION for discovery
     # and COMMENTS for inventory
-    if (exists $info{DESCRIPTION}) {
-        $info{COMMENTS} = $info{DESCRIPTION};
-        delete $info{DESCRIPTION};
+    if (exists $info->{DESCRIPTION}) {
+        $info->{COMMENTS} = $info->{DESCRIPTION};
+        delete $info->{DESCRIPTION};
     }
 
     # host name is defined as SNMPHOSTNAME for discovery
     # and NAME for inventory
-    if (exists $info{SNMPHOSTNAME}) {
-        $info{NAME} = $info{SNMPHOSTNAME};
-        delete $info{SNMPHOSTNAME};
+    if (exists $info->{SNMPHOSTNAME}) {
+        $info->{NAME} = $info->{SNMPHOSTNAME};
+        delete $info->{SNMPHOSTNAME};
     }
 
     # device ID is set from the server request
-    $info{ID} = $params{id};
+    $info->{ID} = $params{id};
 
     # device TYPE is set either:
     # - from the server request,
     # - from initial identification
-    $info{TYPE} = $params{type} || $info{TYPE};
+    $info->{TYPE} = $params{type} || $info->{TYPE};
 
     # second, use results to build the object
-    my $device = { INFO => \%info };
+    my $device = { INFO => $info };
 
     _setGenericProperties(
         device => $device,
@@ -560,14 +560,14 @@ sub getDeviceFullInfo {
         snmp    => $snmp,
         logger  => $logger,
         datadir => $params{datadir}
-    ) if $info{TYPE} && $info{TYPE} eq 'PRINTER';
+    ) if $info->{TYPE} && $info->{TYPE} eq 'PRINTER';
 
     _setNetworkingProperties(
         device  => $device,
         snmp    => $snmp,
         logger  => $logger,
         datadir => $params{datadir}
-    ) if $info{TYPE} && $info{TYPE} eq 'NETWORKING';
+    ) if $info->{TYPE} && $info->{TYPE} eq 'NETWORKING';
 
     # convert ports hashref to an arrayref, sorted by interface number
     my $ports = $device->{PORTS}->{PORT};
@@ -697,7 +697,7 @@ sub _setPrinterProperties {
         if ($type eq 'TONER' || $type eq 'DRUM' || $type eq 'CARTRIDGE' || $type eq 'DEVELOPER') {
             my $color;
             if ($color_id) {
-                $color = hex2char($colors->{$color_id});
+                $color = _getCanonicalString($colors->{$color_id});
                 if (!$color) {
                     $logger->debug("invalid color ID $color_id") if $logger;
                     next;
@@ -706,10 +706,10 @@ sub _setPrinterProperties {
                 # fallback on description
                 my $description = $descriptions->{$consumable_id};
                 $color =
-                    $description =~ /cyan/i           ? 'cyan'    : 
-                    $description =~ /magenta/i        ? 'magenta' : 
-                    $description =~ /(yellow|jaune)/i ? 'yellow'  : 
-                    $description =~ /(black|noir)/i   ? 'black'   : 
+                    $description =~ /cyan/i           ? 'cyan'    :
+                    $description =~ /magenta/i        ? 'magenta' :
+                    $description =~ /(yellow|jaune)/i ? 'yellow'  :
+                    $description =~ /(black|noir)/i   ? 'black'   :
                                                         'black'   ;
             }
             $type .= uc($color);
@@ -829,6 +829,9 @@ sub _getCanonicalMacAddress {
         $result = sprintf
             "%02x:%02x:%02x:%02x:%02x:%02x",
             map { hex($_) } split(':', $value);
+    } elsif ($value =~ /^\d{2}:\d{2}:\d{2}:\d{2}:\d{2}$/) {
+        # WWN format
+        $result = '10:00:00:' . $value;
     } else {
         # this was stored as an hex-string
         # 0xD205A86C26D5 or 0x6001D205A86C26D5
@@ -851,8 +854,13 @@ sub _getCanonicalString {
     $value = hex2char($value);
     return unless $value;
 
+    # truncate after first null-character
+    $value =~ s/\000.*$//;
+
+    # unquote string
     $value =~ s/^\\?["']//;
     $value =~ s/\\?["']$//;
+
     return unless $value;
 
     return $value;
@@ -1186,22 +1194,32 @@ sub _getLLDPInfo {
     # whereas y is either a port or an interface id
 
     while (my ($suffix, $mac) = each %{$lldpRemChassisId}) {
+        my $sysdescr = _getCanonicalString($lldpRemSysDesc->{$suffix});
+        next unless $sysdescr;
+
+        my $connection = {
+            SYSMAC   => lc(alt2canonical($mac)),
+            SYSDESCR => $sysdescr
+        };
+
+        # portId is either a port number or a port mac address,
+        # duplicating chassiId
+        my $portId = $lldpRemPortId->{$suffix};
+        if ($portId !~ /^0x/ or length($portId) != 14) {
+            $connection->{IFNUMBER} = $portId;
+        }
+
+        my $ifdescr = _getCanonicalString($lldpRemPortDesc->{$suffix});
+        $connection->{IFDESCR} = $ifdescr if $ifdescr;
+
+        my $sysname = _getCanonicalString($lldpRemSysName->{$suffix});
+        $connection->{SYSNAME} = $sysname if $sysname;
+
         my $id           = _getElement($suffix, -2);
         my $interface_id =
             ! exists $port2interface->{$id} ? $id                   :
             $params{vendor} eq 'Juniper'    ? $id                   :
                                               $port2interface->{$id};
-
-
-        my $connection = {
-            SYSMAC   => lc(alt2canonical($mac)),
-            IFDESCR  => $lldpRemPortDesc->{$suffix},
-            SYSDESCR => $lldpRemSysDesc->{$suffix},
-            SYSNAME  => hex2char($lldpRemSysName->{$suffix}),
-            IFNUMBER => $lldpRemPortId->{$suffix}
-        };
-
-        next if !$connection->{SYSDESCR};
 
         $results->{$interface_id} = $connection;
     }
@@ -1231,10 +1249,14 @@ sub _getCDPInfo {
         $ip = hex2canonical($ip);
         next if $ip eq '0.0.0.0';
 
+        my $sysdescr = _getCanonicalString($cdpCacheVersion->{$suffix});
+        my $model    = _getCanonicalString($cdpCachePlatform->{$suffix});
+        next unless $sysdescr && $model;
+
         my $connection = {
             IP       => $ip,
-            SYSDESCR => $cdpCacheVersion->{$suffix},
-            MODEL    => $cdpCachePlatform->{$suffix}
+            SYSDESCR => $sysdescr,
+            MODEL    => $model,
         };
 
         # cdpCacheDevicePort is either a port number or a port description
@@ -1253,7 +1275,7 @@ sub _getCDPInfo {
                 $connection->{SYSMAC} = lc(alt2canonical($deviceId));
             } else {
                 # otherwise it's an hex-encode hostname
-                $connection->{SYSNAME} = hex2char($deviceId);
+                $connection->{SYSNAME} = _getCanonicalString($deviceId);
             }
         } else {
             $connection->{SYSNAME} = $deviceId;
@@ -1263,8 +1285,6 @@ sub _getCDPInfo {
             $connection->{SYSNAME} =~ /^SIP([A-F0-9a-f]*)$/) {
             $connection->{MAC} = lc(alt2canonical("0x".$1));
         }
-
-        next if !$connection->{SYSDESCR} || !$connection->{MODEL};
 
         # warning: multiple neighbors announcement for the same interface
         # usually means a non-CDP aware intermediate equipement
@@ -1530,7 +1550,8 @@ sub _getPAGPInfo {
     my $results;
     my $pagpPorts = $snmp->walk('.1.3.6.1.4.1.9.9.98.1.1.1.1.5');
 
-    while (my ($port_id, $portShortNum) = each %{$pagpPorts}) {
+    foreach my $port_id (sort keys %$pagpPorts) {
+        my $portShortNum = $pagpPorts->{$port_id};
         next unless $portShortNum > 0;
         my $aggregatePort_id = $portShortNum + 5000;
         push @{$results->{$aggregatePort_id}}, $port_id;

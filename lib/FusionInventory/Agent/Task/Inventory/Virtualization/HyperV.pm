@@ -27,21 +27,42 @@ sub doInventory {
 }
 
 sub _getVirtualMachines {
+    FusionInventory::Agent::Tools::Win32->require();
 
-    FusionInventory::Agent::Tools::Win32->use();
-
-    my $host = FusionInventory::Agent::Tools::Hostname::getHostname() ||
-               $ENV{COMPUTERNAME};
-    $host =~ s/^([^.]+)/$1/;
+    my $hostname = getHostname(short => 1);
 
     my @machines;
 
-    foreach my $object (getWMIObjects(
+    # index memory and cpu information
+    my %memory;
+    foreach my $object (FusionInventory::Agent::Tools::Win32::getWMIObjects(
+        moniker    => 'winmgmts://./root/virtualization',
+        class      => 'MSVM_MemorySettingData',
+        properties => [ qw/InstanceID VirtualQuantity/ ]
+    )) {
+        my $id = $object->{InstanceID};
+        next unless $id =~ /^Microsoft:([^\\]+)/;
+        $memory{$1} = $object->{VirtualQuantity};
+    }
+
+    my %vcpu;
+    foreach my $object (FusionInventory::Agent::Tools::Win32::getWMIObjects(
+        moniker    => 'winmgmts://./root/virtualization',
+        class      => 'MSVM_ProcessorSettingData',
+        properties => [ qw/InstanceID VirtualQuantity/ ]
+    )) {
+        my $id = $object->{InstanceID};
+        next unless $id =~ /^Microsoft:([^\\]+)/;
+        $vcpu{$1} = $object->{VirtualQuantity};
+    }
+
+    foreach my $object (FusionInventory::Agent::Tools::Win32::getWMIObjects(
+        moniker    => 'winmgmts://./root/virtualization',
         class      => 'MSVM_ComputerSystem',
         properties => [ qw/ElementName EnabledState Name/ ]
     )) {
         # skip host
-        next if $object->{Name} eq $host;
+        next if lc($object->{Name}) eq lc($hostname);
 
         my $status =
             $object->{EnabledState} == 2     ? 'running'  :
@@ -54,6 +75,8 @@ sub _getVirtualMachines {
             STATUS    => $status,
             NAME      => $object->{ElementName},
             UUID      => $object->{Name},
+            MEMORY    => $memory{$object->{Name}},
+            VCPU      => $vcpu{$object->{Name}},
         };
 
         push @machines, $machine;
