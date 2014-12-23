@@ -21,7 +21,7 @@ use FusionInventory::Agent::Tools;
 use FusionInventory::Agent::Tools::Hostname;
 use FusionInventory::Agent::XML::Query::Prolog;
 
-our $VERSION = '2.3.13';
+our $VERSION = '2.3.14';
 our $VERSION_STRING = _versionString($VERSION);
 our $AGENT_STRING = "FusionInventory-Agent_v$VERSION";
 
@@ -139,8 +139,11 @@ sub init {
     $self->{tasks} = \@tasks;
 
     if ($config->{daemon}) {
-        if ($self->_isAlreadyRunning()) {
-            $logger->debug("An agent is already running, exiting...");
+        my $pidfile  = $config->{pidfile} ||
+                       $self->{vardir} . '/fusioninventory.pid';
+
+        if ($self->_isAlreadyRunning($pidfile)) {
+            $logger->error("An agent is already running, exiting...");
             exit 1;
         }
         if (!$config->{'no-fork'}) {
@@ -151,13 +154,13 @@ sub init {
                 exit 1;
             }
 
-            my $cwd = getcwd();
-            Proc::Daemon::Init();
-
             # If we use relative path, we must stay in the current directory
-            if (substr( $params{libdir}, 0, 1 ) ne '/') {
-                chdir($cwd);
-            }
+            my $workdir = substr($self->{libdir}, 0, 1) eq '/' ? '/' : getcwd();
+
+            Proc::Daemon::Init({
+                work_dir => $workdir,
+                pid_file => $pidfile
+            });
 
             $self->{logger}->debug("Agent daemonized");
         }
@@ -436,7 +439,7 @@ sub _getTaskVersion {
 }
 
 sub _isAlreadyRunning {
-    my ($self) = @_;
+    my ($self, $pidfile) = @_;
 
     Proc::PID::File->require();
     if ($EVAL_ERROR) {
@@ -446,7 +449,9 @@ sub _isAlreadyRunning {
         return 0;
     }
 
-    return Proc::PID::File->running();
+    my $pid = Proc::PID::File->new();
+    $pid->{path} = $pidfile;
+    return $pid->alive();
 }
 
 sub _loadState {

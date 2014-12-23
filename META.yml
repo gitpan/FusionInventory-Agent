@@ -45,7 +45,7 @@ recommends:
   Digest::SHA: 0
   File::Copy::Recursive: 0
   HTTP::Daemon: 0
-  IO::Socket::SSL: 0
+  IO::Socket::SSL: '1.14'
   JSON: 0
   LWP::Protocol::https: 0
   Net::CUPS: 0.6
@@ -56,6 +56,7 @@ recommends:
   Parse::EDID: 0
   Proc::Daemon: 0
   Proc::PID::File: 0
+  Thread::Queue: '2.01'
   URI::Escape: 0
 requires:
   File::Which: 0
@@ -71,4 +72,4 @@ resources:
   homepage: http://www.fusioninventory.org
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/fusinv/fusioninventory-agent/
-version: 2.3.13
+version: 2.3.14
