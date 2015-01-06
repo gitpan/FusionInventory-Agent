@@ -40,8 +40,6 @@ no_index:
 recommends:
   Archive::Extract: 0
   Compress::Zlib: 0
-  Crypt::DES: 0
-  Digest::MD5: 0
   Digest::SHA: 0
   File::Copy::Recursive: 0
   HTTP::Daemon: 0
@@ -60,7 +58,7 @@ recommends:
   URI::Escape: 0
 requires:
   File::Which: 0
-  LWP: '5.8'
+  LWP::UserAgent: '5.8'
   Net::IP: 0
   Text::Template: 0
   UNIVERSAL::require: 0
@@ -72,4 +70,4 @@ resources:
   homepage: http://www.fusioninventory.org
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/fusinv/fusioninventory-agent/
-version: 2.3.14
+version: 2.3.15
